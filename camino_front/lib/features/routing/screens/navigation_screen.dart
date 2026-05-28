@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'route_details_screen.dart';
-import '../../reporting/screens/report_barrier_screen.dart';
+import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 
 class NavigationScreen extends StatefulWidget {
   const NavigationScreen({super.key});
@@ -10,11 +9,10 @@ class NavigationScreen extends StatefulWidget {
 }
 
 class _NavigationScreenState extends State<NavigationScreen> {
-  // Estado inicial simulado
-  final bool _hasAlert = true;
-  final String _destination = "IMSS Clínica 1";
-  final String _mobilityMode = "Bastón";
-  final String _alertMessage = "Rampa bloqueada · 80m adelante";
+  bool _hasAlert = true;
+  String _destination = "IMSS Clínica 1";
+  String _mobilityMode = "Bastón";
+  String _alertMessage = "Rampa bloqueada · 80m adelante";
 
   @override
   Widget build(BuildContext context) {
@@ -35,12 +33,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Ruta activa · Centro, Tijuana',
+                    "Ruta activa · Centro, Tijuana",
                     style: TextStyle(
                       color: Color(0xFF9AA0A6),
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
                       fontSize: 16,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
@@ -54,7 +52,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
             left: 0,
             right: 0,
             child: SafeArea(
-              bottom: false,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Container(
@@ -79,10 +76,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
+                          color: Colors.black,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const Icon(
                             Icons.directions_walk_rounded,
@@ -111,10 +110,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ),
           ),
 
-          // CAPA 3 — Card de alerta
+          // CAPA 3 — Card de alerta (solo si _hasAlert == true)
           if (_hasAlert)
             Positioned(
-              top: 120,
+              top: 130,
               left: 16,
               right: 16,
               child: Container(
@@ -147,6 +146,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
+                                  color: Colors.black,
                                 ),
                               ),
                               Text(
@@ -161,26 +161,19 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {
-                          // Acción de dummy para recalcular ruta
-                        },
+                        onPressed: () {},
                         style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          "Ver ruta alternativa",
-                          style: TextStyle(
-                            color: Color(0xFF4285F4),
+                          foregroundColor: const Color(0xFF4285F4),
+                          textStyle: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        child: const Text("Ver ruta alternativa"),
                       ),
                     ),
                   ],
@@ -190,15 +183,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
           // CAPA 4 — FAB de ubicación
           Positioned(
-            bottom: 112,
+            bottom: 108,
             right: 20,
             child: Semantics(
               button: true,
               label: "Centrar mapa en mi ubicación",
               child: GestureDetector(
-                onTap: () {
-                  // Acción de dummy para centrar ubicación
-                },
+                onTap: () {},
                 child: Container(
                   width: 52,
                   height: 52,
@@ -207,7 +198,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withOpacity(0.06),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -228,82 +219,63 @@ class _NavigationScreenState extends State<NavigationScreen> {
             bottom: 0,
             left: 0,
             right: 0,
-            child: Container(
-              color: Colors.white,
-              child: SafeArea(
-                top: false,
-                bottom: true,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Semantics(
-                          button: true,
-                          label: "Reportar una barrera en la ruta actual",
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.report_problem_rounded),
-                            label: const Text(
-                              "Reportar barrera",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+            child: SafeArea(
+              bottom: true,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        label: "Reportar una barrera en la ruta actual",
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.report_problem_rounded),
+                          label: const Text("Reportar barrera"),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF4285F4),
+                            side: const BorderSide(color: Color(0xFF4285F4)),
+                            minimumSize: const Size(double.infinity, 56),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(32),
                             ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF4285F4),
-                              side: const BorderSide(
-                                color: Color(0xFF4285F4),
-                                width: 2, // Grosor ajustado para accesibilidad
-                              ),
-                              minimumSize: const Size(double.infinity, 56),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(32),
-                              ),
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReportBarrierScreen(),
                             ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ReportBarrierScreen(),
-                                ),
-                              );
-                            },
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Semantics(
-                          button: true,
-                          label: "Terminar la navegación y volver al inicio",
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.stop_circle_rounded),
-                            label: const Text(
-                              "Finalizar viaje",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        label: "Terminar navegación y volver al inicio",
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.stop_circle_rounded),
+                          label: const Text("Finalizar viaje"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEA4335),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 56),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(32),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFEA4335),
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 56),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(32),
-                              ),
-                            ),
-                            onPressed: () {
-                              Navigator.popUntil(context, (r) => r.isFirst);
-                            },
+                          ),
+                          onPressed: () => Navigator.popUntil(
+                            context,
+                            (route) => route.isFirst,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
