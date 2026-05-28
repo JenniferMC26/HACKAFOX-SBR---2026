@@ -33,7 +33,7 @@ class MobilityCard extends StatelessWidget {
                 color: isSelected ? AppColors.primary : Colors.grey.shade200,
                 width: 2),
               boxShadow: isSelected ? [BoxShadow(
-                color: AppColors.primary.withOpacity(0.15),
+                color: AppColors.primary.withValues(alpha: 0.15),
                 blurRadius: 10,
                 offset: const Offset(0, 4))] : []),
             child: Icon(icon,

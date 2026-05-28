@@ -26,7 +26,7 @@ class RouteInfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade200, width: 1.5),
         boxShadow: [BoxShadow(
-          color: Colors.black.withOpacity(0.03),
+          color: Colors.black.withValues(alpha: 0.03),
           blurRadius: 15,
           offset: const Offset(0, 8))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
