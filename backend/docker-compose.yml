@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Paso — docker-compose.yml
+#
+# Define dos servicios:
+#   emulator  → Firebase Emulator Suite (DB + Functions + Storage locales)
+#   seed      → Runner para los scripts de seed (firebase-seed, bigquery, etc.)
+#
+# Comandos frecuentes:
+#   docker compose up               → levantar el emulador
+#   docker compose up --build       → reconstruir imagen y levantar
+#   docker compose run seed node seed/firebase-seed.js
+#   docker compose run seed python3 seed/bigquery_seed.py
+#   docker compose run seed node seed/upload-field-photos.js
+#   docker compose down             → apagar todo
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Emulador local de Firebase ──────────────────────────────────────────────
+  emulator:
+    build: .
+    container_name: paso_emulator
+    ports:
+      - "4000:4000"   # Emulator UI  → abrir en browser: http://localhost:4000
+      - "5001:5001"   # Functions    → http://localhost:5001/vialibretj/us-central1/<fn>
+      - "9000:9000"   # Realtime DB  → se conecta automáticamente desde el HTML
+      - "9199:9199"   # Storage
+    volumes:
+      # Montar el proyecto completo para que los cambios en código se reflejen
+      # sin necesidad de reconstruir la imagen
+      - .:/app
+      # Caché de npm separado para no perderlo entre contenedores
+      - node_modules_cache:/app/functions/node_modules
+    environment:
+      # Las variables del .env se pasan al contenedor
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      # Le indica a los SDKs de Firebase que usen el emulador local
+      - FIREBASE_EMULATOR_HUB=emulator:4400
+      - FUNCTIONS_EMULATOR=true
+    env_file:
+      - .env
+
+  # ── Runner de scripts de seed ───────────────────────────────────────────────
+  # No levanta servidor — solo corre scripts bajo demanda con `docker compose run`
+  seed:
+    build: .
+    container_name: paso_seed
+    volumes:
+      - .:/app
+      - node_modules_cache:/app/functions/node_modules
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+    env_file:
+      - .env
+    # Sin comando por defecto — se le pasa en el `docker compose run`
+    entrypoint: []
+    command: ["echo", "Usa: docker compose run seed <comando>"]
+
+volumes:
+  node_modules_cache:

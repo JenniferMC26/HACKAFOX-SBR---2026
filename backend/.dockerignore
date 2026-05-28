@@ -1,0 +1,22 @@
+# Dependencias — Docker las instala dentro del contenedor
+node_modules
+functions/node_modules
+
+# Credenciales — NUNCA van en la imagen
+serviceAccountKey.json
+.env
+
+# Fotos de campo — pesadas, no van en la imagen
+seed/fotos/
+
+# Git y editor
+.git
+.gitignore
+.vscode
+*.log
+
+# Firebase emulator data local
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
