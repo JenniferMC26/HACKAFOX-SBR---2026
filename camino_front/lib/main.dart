@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/starting_Screen.dart';
 
 void main() {
   runApp(const MainApp());
@@ -9,8 +10,13 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(body: Center(child: Text('Camino'))),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: Colors.white,
+      ),
+      home: const MapScreen(),
     );
   }
 }
