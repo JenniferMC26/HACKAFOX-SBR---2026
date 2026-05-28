@@ -14,7 +14,7 @@ class MapPlaceholder extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.map_rounded, size: 80,
-              color: AppColors.secondary.withOpacity(0.6)),
+              color: AppColors.secondary.withValues(alpha: 0.6)),
             const SizedBox(height: 12),
             Text(label,
               style: TextStyle(

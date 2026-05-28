@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'route_details_screen.dart';
+import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
@@ -21,7 +22,7 @@ class MapScreen extends StatelessWidget {
                   Icon(
                     Icons.map_rounded,
                     size: 80,
-                    color: const Color(0xFF9AA0A6).withOpacity(0.6),
+                    color: const Color(0xFF9AA0A6).withValues(alpha: 0.6),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -48,7 +49,7 @@ class MapScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -102,7 +103,7 @@ class MapScreen extends StatelessWidget {
               label: 'Reportar barrera arquitectónica en la calle',
               child: FloatingActionButton.extended(
                 onPressed: () {
-                  // TODO: Lógica de reporte
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportBarrierScreen()));
                 },
                 backgroundColor: const Color(0xFFFBBC04),
                 icon: const Icon(
@@ -137,7 +138,7 @@ class MapScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 25,
                       offset: const Offset(0, 12),
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:camino_front/features/routing/screens/navigation_screen.dart';
 
 class RouteDetailsScreen extends StatefulWidget {
   const RouteDetailsScreen({super.key});
@@ -156,7 +157,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
               border: Border.all(color: Colors.grey.shade200, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -250,7 +251,10 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                       ),
                       elevation: 0,
                     ),
-                    onPressed: () {},
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const NavigationScreen()),
+                    ),
                     child: const Text(
                       'Iniciar navegación',
                       style: TextStyle(
@@ -301,7 +305,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF4285F4).withOpacity(0.15),
+                          color: const Color(0xFF4285F4).withValues(alpha: 0.15),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

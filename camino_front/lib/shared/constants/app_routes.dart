@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:camino_front/features/routing/screens/starting_Screen.dart';
+import 'package:camino_front/features/routing/screens/starting_screen.dart';
 import 'package:camino_front/features/routing/screens/route_details_screen.dart';
 import 'package:camino_front/features/routing/screens/navigation_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';

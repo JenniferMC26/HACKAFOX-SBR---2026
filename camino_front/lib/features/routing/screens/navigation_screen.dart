@@ -9,10 +9,10 @@ class NavigationScreen extends StatefulWidget {
 }
 
 class _NavigationScreenState extends State<NavigationScreen> {
-  bool _hasAlert = true;
-  String _destination = "IMSS Clínica 1";
-  String _mobilityMode = "Bastón";
-  String _alertMessage = "Rampa bloqueada · 80m adelante";
+  final bool _hasAlert = true;
+  final String _destination = "IMSS Clínica 1";
+  final String _mobilityMode = "Bastón";
+  final String _alertMessage = "Rampa bloqueada · 80m adelante";
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +29,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   Icon(
                     Icons.map_rounded,
                     size: 80,
-                    color: const Color(0xFF9AA0A6).withOpacity(0.6),
+                    color: const Color(0xFF9AA0A6).withValues(alpha: 0.6),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -61,7 +61,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -198,7 +198,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
