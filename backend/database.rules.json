@@ -1,0 +1,38 @@
+{
+  "rules": {
+    "accessibility_layer": {
+      ".read": true,
+      ".write": false,
+      ".indexOn": ["geohash"]
+    },
+    "reports": {
+      "$reportId": {
+        ".read": "auth != null && data.child('userId').val() === auth.uid",
+        ".write": "auth != null && !data.exists() && newData.child('userId').val() === auth.uid"
+      }
+    },
+    "crisis_sessions": {
+      "$sessionId": {
+        ".read": "auth != null && data.child('userId').val() === auth.uid",
+        ".write": false
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "notifications": {
+          ".write": false
+        },
+        "reportCount": {
+          ".read": false,
+          ".write": false
+        }
+      }
+    },
+    "counters": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

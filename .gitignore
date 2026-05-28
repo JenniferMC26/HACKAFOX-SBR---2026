@@ -1,0 +1,29 @@
+# Credenciales — NUNCA commitear
+backend/serviceAccountKey.json
+backend/.env
+**/.env.local
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Fotos de campo (pesadas)
+backend/seed/fotos/
+
+# Firebase emulator
+.firebase/
+firebase-debug.log
+firestore-debug.log
+database-debug.log
+ui-debug.log
+storage-debug.log
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editores / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
