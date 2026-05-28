@@ -48,11 +48,16 @@ COPY . .
 
 # ── Puertos del Firebase Emulator Suite ──────────────────────────────────────
 # 4000  → Emulator UI   (panel visual para ver DB, Storage, Auth, logs)
+# 5000  → Hosting       (sirve backend/public — test console)
 # 5001  → Functions     (endpoints HTTP de las Cloud Functions)
 # 9000  → Realtime DB   (Firebase Realtime Database emulada)
 # 9099  → Auth          (Firebase Auth emulado)
 # 9199  → Storage       (Firebase Storage emulado)
-EXPOSE 4000 5001 9000 9099 9199
+EXPOSE 4000 5000 5001 9000 9099 9199
 
 # ── Comando por defecto: levantar los emuladores ──────────────────────────────
-CMD ["firebase", "emulators:start", "--only", "functions,database,storage,auth", "--project", "paso"]
+# `--host 0.0.0.0` es necesario dentro del contenedor para que los puertos sean
+# accesibles desde la máquina host (por defecto firebase bindea a 127.0.0.1).
+CMD ["firebase", "emulators:start", \
+     "--only", "functions,database,storage,auth,hosting", \
+     "--project", "paso"]

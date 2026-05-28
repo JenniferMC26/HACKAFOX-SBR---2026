@@ -23,12 +23,12 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   },
   "emulators": {
-    "functions": { "port": 5001 },
-    "database": { "port": 9000 },
-    "auth": { "port": 9099 },
-    "storage": { "port": 9199 },
-    "hosting": { "port": 5000 },
-    "ui": { "enabled": true, "port": 4000 },
+    "functions": { "port": 5001, "host": "0.0.0.0" },
+    "database":  { "port": 9000, "host": "0.0.0.0" },
+    "auth":      { "port": 9099, "host": "0.0.0.0" },
+    "storage":   { "port": 9199, "host": "0.0.0.0" },
+    "hosting":   { "port": 5000, "host": "0.0.0.0" },
+    "ui":        { "enabled": true, "port": 4000, "host": "0.0.0.0" },
     "singleProjectMode": true
   }
 }
