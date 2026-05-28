@@ -4,10 +4,260 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Paso — Test Console</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+    header { background: #1f3a5f; color: #fff; padding: 14px 22px; display: flex; align-items: center; gap: 16px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    header .uid { font-family: monospace; font-size: 12px; opacity: 0.85; }
+    nav { background: #fff; border-bottom: 1px solid #e3e6ea; padding: 0 22px; display: flex; gap: 4px; }
+    nav button { background: none; border: none; padding: 12px 16px; cursor: pointer; font-size: 14px; color: #555; border-bottom: 2px solid transparent; }
+    nav button.active { color: #1f3a5f; border-bottom-color: #1f3a5f; font-weight: 600; }
+    main { padding: 22px; max-width: 980px; margin: 0 auto; }
+    section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06); display: none; }
+    section.active { display: block; }
+    h2 { margin: 0 0 14px; font-size: 16px; color: #1f3a5f; }
+    label { display: block; font-size: 12px; color: #555; margin-top: 10px; }
+    input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ccd2da; border-radius: 5px; font-size: 14px; font-family: inherit; }
+    textarea { min-height: 60px; resize: vertical; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    button.primary { margin-top: 14px; background: #1f3a5f; color: #fff; border: none; padding: 10px 18px; border-radius: 5px; font-size: 14px; cursor: pointer; }
+    button.primary:hover { background: #2a4f80; }
+    pre { background: #0e1422; color: #d4e0f0; padding: 14px; border-radius: 5px; font-size: 12px; overflow: auto; max-height: 320px; margin-top: 14px; }
+    .hint { font-size: 12px; color: #777; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; background: #ffeec0; color: #6b4500; border-radius: 10px; font-size: 11px; margin-left: 6px; }
+  </style>
 </head>
 <body>
-  <h1>Paso — Test Console</h1>
-  <p>Pestañas por feature se agregan en cada fase.</p>
-  <script type="module" src="./firebase-config.js"></script>
+  <header>
+    <h1>Paso — Test Console</h1>
+    <span class="badge">emulator</span>
+    <span class="uid" id="uid">conectando…</span>
+  </header>
+
+  <nav>
+    <button data-tab="routing" class="active">Routing</button>
+    <button data-tab="report">Reporte</button>
+    <button data-tab="rutaviva">Ruta Viva</button>
+    <button data-tab="voice">Voz</button>
+    <button data-tab="crisis">Crisis</button>
+  </nav>
+
+  <main>
+    <!-- ── Routing ────────────────────────────────────────────────────────── -->
+    <section id="routing" class="active">
+      <h2>POST /routingAccessible</h2>
+      <div class="row">
+        <div><label>Origen lat</label><input id="r-olat" value="32.5266" /></div>
+        <div><label>Origen lng</label><input id="r-olng" value="-117.0382" /></div>
+      </div>
+      <div class="row">
+        <div><label>Destino lat</label><input id="r-dlat" value="32.5248" /></div>
+        <div><label>Destino lng</label><input id="r-dlng" value="-117.0284" /></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Perfil</label>
+          <select id="r-profile">
+            <option value="wheelchair">wheelchair</option>
+            <option value="elderly">elderly</option>
+            <option value="cane">cane</option>
+            <option value="stroller">stroller</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+        <div>
+          <label>arrivalTime (opcional)</label>
+          <input id="r-arrival" placeholder="2026-05-28T10:00:00-07:00" />
+        </div>
+      </div>
+      <button class="primary" onclick="callRouting()">Calcular ruta</button>
+      <pre id="r-out">—</pre>
+    </section>
+
+    <!-- ── Report ─────────────────────────────────────────────────────────── -->
+    <section id="report">
+      <h2>POST /reportSubmit</h2>
+      <p class="hint">Sube una imagen al emulador de Storage y envía la URL al endpoint. En modo MOCK, Gemini devuelve análisis determinista basado en la URL.</p>
+      <div class="row">
+        <div><label>Lat</label><input id="rep-lat" value="32.5305" /></div>
+        <div><label>Lng</label><input id="rep-lng" value="-117.0349" /></div>
+      </div>
+      <label>Foto (jpg/png)</label>
+      <input type="file" id="rep-file" accept="image/*" />
+      <button class="primary" onclick="callReport()">Subir y reportar</button>
+      <pre id="rep-out">—</pre>
+    </section>
+
+    <!-- ── Ruta Viva ──────────────────────────────────────────────────────── -->
+    <section id="rutaviva">
+      <h2>GET /rutaVivaScore</h2>
+      <div class="row">
+        <div><label>Lat</label><input id="rv-lat" value="32.5266" /></div>
+        <div><label>Lng</label><input id="rv-lng" value="-117.0382" /></div>
+      </div>
+      <label>arrivalTime (ISO con offset)</label>
+      <input id="rv-arrival" value="2026-05-28T10:00:00-07:00" />
+      <p class="hint">Tip: prueba miércoles 10am en Mercado Hidalgo (32.5266, -117.0382) — debe bajar.</p>
+      <button class="primary" onclick="callRutaViva()">Consultar score</button>
+      <pre id="rv-out">—</pre>
+    </section>
+
+    <!-- ── Voz ────────────────────────────────────────────────────────────── -->
+    <section id="voice">
+      <h2>POST /voiceQuery</h2>
+      <label>Texto del usuario (simulando voz)</label>
+      <textarea id="v-text">llévame al imss de aquí cerca</textarea>
+      <div class="row">
+        <div><label>Origen lat</label><input id="v-olat" value="32.5305" /></div>
+        <div><label>Origen lng</label><input id="v-olng" value="-117.0349" /></div>
+      </div>
+      <label>Perfil</label>
+      <select id="v-profile">
+        <option value="wheelchair">wheelchair</option>
+        <option value="elderly">elderly</option>
+        <option value="cane">cane</option>
+      </select>
+      <button class="primary" onclick="callVoice()">Enviar</button>
+      <pre id="v-out">—</pre>
+    </section>
+
+    <!-- ── Crisis ─────────────────────────────────────────────────────────── -->
+    <section id="crisis">
+      <h2>Modo Crisis</h2>
+      <div class="row">
+        <div><label>Lat</label><input id="c-lat" value="32.5266" /></div>
+        <div><label>Lng</label><input id="c-lng" value="-117.0382" /></div>
+      </div>
+      <div class="row">
+        <button class="primary" onclick="crisisStart()">Estoy varado</button>
+        <button class="primary" onclick="crisisUpdate()" style="background:#555">Update posición</button>
+        <button class="primary" onclick="crisisResolve()" style="background:#8a3030">Resolver</button>
+      </div>
+      <label>sessionId activo</label>
+      <input id="c-sid" placeholder="se llena después de Start" />
+      <pre id="c-out">—</pre>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth } from './firebase-config.js';
+    import { ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
+    import { getStorage } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
+
+    const FN_BASE = location.hostname === 'localhost'
+      ? 'http://localhost:5001/paso/us-central1'
+      : 'https://us-central1-paso.cloudfunctions.net';
+
+    let idToken = null;
+
+    auth.authStateReady().then(async () => {
+      if (!auth.currentUser) return;
+      idToken = await auth.currentUser.getIdToken();
+      document.getElementById('uid').textContent = `uid: ${auth.currentUser.uid}`;
+    });
+
+    async function call(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+      const res = await fetch(`${FN_BASE}/${path}`, { ...opts, headers });
+      const text = await res.text();
+      try { return { status: res.status, body: JSON.parse(text) }; }
+      catch { return { status: res.status, body: text }; }
+    }
+
+    function show(id, data) {
+      document.getElementById(id).textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Tab switching
+    document.querySelectorAll('nav button').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
+        document.querySelectorAll('section').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        document.getElementById(b.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Routing
+    window.callRouting = async () => {
+      const body = {
+        origin: { lat: parseFloat(r_olat.value), lng: parseFloat(r_olng.value) },
+        destination: { lat: parseFloat(r_dlat.value), lng: parseFloat(r_dlng.value) },
+        userProfile: r_profile.value,
+      };
+      if (r_arrival.value) body.arrivalTime = r_arrival.value;
+      show('r-out', await call('routingAccessible', { method: 'POST', body: JSON.stringify(body) }));
+    };
+
+    // Report — subir foto al Storage emulator → mandar URL al endpoint
+    window.callReport = async () => {
+      const file = rep_file.files[0];
+      if (!file) { show('rep-out', { error: 'Selecciona una foto' }); return; }
+      if (!auth.currentUser) { show('rep-out', { error: 'Esperando auth…' }); return; }
+      const path = `reports/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
+      const storage = getStorage();
+      const r = sRef(storage, path);
+      await uploadBytes(r, file);
+      const photoUrl = await getDownloadURL(r);
+      show('rep-out', await call('reportSubmit', {
+        method: 'POST',
+        body: JSON.stringify({
+          lat: parseFloat(rep_lat.value),
+          lng: parseFloat(rep_lng.value),
+          photoUrl,
+        }),
+      }));
+    };
+
+    // Ruta Viva
+    window.callRutaViva = async () => {
+      const url = `rutaVivaScore?lat=${rv_lat.value}&lng=${rv_lng.value}&arrivalTime=${encodeURIComponent(rv_arrival.value)}`;
+      show('rv-out', await call(url));
+    };
+
+    // Voice
+    window.callVoice = async () => {
+      show('v-out', await call('voiceQuery', {
+        method: 'POST',
+        body: JSON.stringify({
+          userText: v_text.value,
+          origin: { lat: parseFloat(v_olat.value), lng: parseFloat(v_olng.value) },
+          userProfile: v_profile.value,
+        }),
+      }));
+    };
+
+    // Crisis
+    window.crisisStart = async () => {
+      const res = await call('crisisStart', {
+        method: 'POST',
+        body: JSON.stringify({ lat: parseFloat(c_lat.value), lng: parseFloat(c_lng.value) }),
+      });
+      if (res.body && res.body.sessionId) c_sid.value = res.body.sessionId;
+      show('c-out', res);
+    };
+    window.crisisUpdate = async () => {
+      if (!c_sid.value) { show('c-out', { error: 'No hay sessionId activo' }); return; }
+      show('c-out', await call('crisisUpdate', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: c_sid.value,
+          lat: parseFloat(c_lat.value),
+          lng: parseFloat(c_lng.value),
+        }),
+      }));
+    };
+    window.crisisResolve = async () => {
+      if (!c_sid.value) { show('c-out', { error: 'No hay sessionId activo' }); return; }
+      show('c-out', await call('crisisResolve', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: c_sid.value }),
+      }));
+      c_sid.value = '';
+    };
+  </script>
 </body>
 </html>

@@ -33,9 +33,13 @@ RUN pip3 install --break-system-packages google-cloud-bigquery
 # ── Directorio de trabajo ─────────────────────────────────────────────────────
 WORKDIR /app
 
-# ── Instalar dependencias de Node (functions/) ────────────────────────────────
-# Se copian primero para aprovechar el cache de Docker:
-# si package.json no cambió, Docker no reinstala en el siguiente build.
+# ── Instalar dependencias de Node ─────────────────────────────────────────────
+# Se copian los package.json primero para aprovechar el cache de Docker:
+# si no cambian, Docker no reinstala en el siguiente build.
+#  - /app/node_modules           → para scripts de seed (firebase-admin, ngeohash)
+#  - /app/functions/node_modules → para las Cloud Functions
+COPY package*.json ./
+RUN npm install
 COPY functions/package*.json ./functions/
 RUN cd functions && npm install
 
@@ -43,11 +47,12 @@ RUN cd functions && npm install
 COPY . .
 
 # ── Puertos del Firebase Emulator Suite ──────────────────────────────────────
-# 4000  → Emulator UI   (panel visual para ver DB, Storage, logs)
+# 4000  → Emulator UI   (panel visual para ver DB, Storage, Auth, logs)
 # 5001  → Functions     (endpoints HTTP de las Cloud Functions)
 # 9000  → Realtime DB   (Firebase Realtime Database emulada)
+# 9099  → Auth          (Firebase Auth emulado)
 # 9199  → Storage       (Firebase Storage emulado)
-EXPOSE 4000 5001 9000 9199
+EXPOSE 4000 5001 9000 9099 9199
 
 # ── Comando por defecto: levantar los emuladores ──────────────────────────────
-CMD ["firebase", "emulators:start", "--only", "functions,database,storage", "--project", "paso"]
+CMD ["firebase", "emulators:start", "--only", "functions,database,storage,auth", "--project", "paso"]

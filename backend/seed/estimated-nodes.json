@@ -1,0 +1,16 @@
+[
+  { "nodeId": "node_imss_zonario_banqueta",    "lat": 32.5245, "lng": -117.0282, "type": "sidewalk",  "score": 6, "barrierType": null },
+  { "nodeId": "node_mercado_hidalgo_acceso",   "lat": 32.5305, "lng": -117.0349, "type": "entrance",  "score": 3, "barrierType": "blocked_sidewalk" },
+  { "nodeId": "node_mercado_hidalgo_calle",    "lat": 32.5308, "lng": -117.0352, "type": "sidewalk",  "score": 2, "barrierType": "blocked_sidewalk" },
+  { "nodeId": "node_revolucion_av_norte",      "lat": 32.5320, "lng": -117.0372, "type": "sidewalk",  "score": 7, "barrierType": null },
+  { "nodeId": "node_revolucion_av_sur",        "lat": 32.5295, "lng": -117.0358, "type": "sidewalk",  "score": 6, "barrierType": null },
+  { "nodeId": "node_hospital_general_estacion","lat": 32.5192, "lng": -117.0291, "type": "crossing",  "score": 7, "barrierType": null },
+  { "nodeId": "node_cecut_paseo_heroes",       "lat": 32.5248, "lng": -117.0074, "type": "sidewalk",  "score": 8, "barrierType": null },
+  { "nodeId": "node_cecut_entrada",            "lat": 32.5251, "lng": -117.0072, "type": "entrance",  "score": 9, "barrierType": null },
+  { "nodeId": "node_sat_tijuana_entrada",      "lat": 32.5212, "lng": -117.0198, "type": "entrance",  "score": 7, "barrierType": null },
+  { "nodeId": "node_banco_azteca_revo",        "lat": 32.5316, "lng": -117.0368, "type": "entrance",  "score": 4, "barrierType": "no_curb_cut" },
+  { "nodeId": "node_farmacia_similares_centro","lat": 32.5302, "lng": -117.0341, "type": "entrance",  "score": 6, "barrierType": null },
+  { "nodeId": "node_parada_ruta664_sanchez",   "lat": 32.5240, "lng": -117.0278, "type": "crossing",  "score": 7, "barrierType": null },
+  { "nodeId": "node_cruce_seguro_av9",         "lat": 32.5180, "lng": -117.0260, "type": "crossing",  "score": 8, "barrierType": null },
+  { "nodeId": "node_centro_comunitario_norte", "lat": 32.5350, "lng": -117.0300, "type": "entrance",  "score": 7, "barrierType": null }
+]

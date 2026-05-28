@@ -2,15 +2,15 @@
 # Paso — docker-compose.yml
 #
 # Define dos servicios:
-#   emulator  → Firebase Emulator Suite (DB + Functions + Storage locales)
+#   emulator  → Firebase Emulator Suite (DB + Functions + Storage + Auth locales)
 #   seed      → Runner para los scripts de seed (firebase-seed, bigquery, etc.)
 #
 # Comandos frecuentes:
 #   docker compose up               → levantar el emulador
 #   docker compose up --build       → reconstruir imagen y levantar
-#   docker compose run seed node seed/firebase-seed.js
-#   docker compose run seed python3 seed/bigquery_seed.py
-#   docker compose run seed node seed/upload-field-photos.js
+#   docker compose run --rm seed node seed/firebase-seed.js
+#   docker compose run --rm seed node seed/users-seed.js
+#   docker compose run --rm seed python3 seed/bigquery_seed.py
 #   docker compose down             → apagar todo
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,46 +21,52 @@ services:
     build: .
     container_name: paso_emulator
     ports:
-      - "4000:4000"   # Emulator UI  → abrir en browser: http://localhost:4000
-      - "5001:5001"   # Functions    → http://localhost:5001/vialibretj/us-central1/<fn>
-      - "9000:9000"   # Realtime DB  → se conecta automáticamente desde el HTML
+      - "4000:4000"   # Emulator UI  → http://localhost:4000
+      - "5001:5001"   # Functions    → http://localhost:5001/paso/us-central1/<fn>
+      - "9000:9000"   # Realtime DB
+      - "9099:9099"   # Auth
       - "9199:9199"   # Storage
     volumes:
-      # Montar el proyecto completo para que los cambios en código se reflejen
-      # sin necesidad de reconstruir la imagen
       - .:/app
-      # Caché de npm separado para no perderlo entre contenedores
-      - node_modules_cache:/app/functions/node_modules
+      - node_modules_cache:/app/node_modules
+      - functions_node_modules_cache:/app/functions/node_modules
     environment:
-      # Las variables del .env se pasan al contenedor
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-      # Le indica a los SDKs de Firebase que usen el emulador local
-      - FIREBASE_EMULATOR_HUB=emulator:4400
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-paso}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-paso.firebasestorage.app}
       - FUNCTIONS_EMULATOR=true
     env_file:
       - .env
 
   # ── Runner de scripts de seed ───────────────────────────────────────────────
-  # No levanta servidor — solo corre scripts bajo demanda con `docker compose run`
+  # Comparte la red con el servicio `emulator`. Sus SDKs apuntan a los puertos
+  # del emulador via los env vars FIREBASE_*_EMULATOR_HOST — nunca tocan prod.
   seed:
     build: .
     container_name: paso_seed
+    depends_on:
+      - emulator
     volumes:
       - .:/app
-      - node_modules_cache:/app/functions/node_modules
+      - node_modules_cache:/app/node_modules
+      - functions_node_modules_cache:/app/functions/node_modules
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-paso}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-paso.firebasestorage.app}
+      # Apuntar Admin SDK al emulador (host = nombre del servicio en la red de compose)
+      - FIREBASE_DATABASE_EMULATOR_HOST=emulator:9000
+      - FIREBASE_AUTH_EMULATOR_HOST=emulator:9099
+      - FIREBASE_STORAGE_EMULATOR_HOST=emulator:9199
+      - GCLOUD_PROJECT=paso
     env_file:
       - .env
-    # Sin comando por defecto — se le pasa en el `docker compose run`
     entrypoint: []
-    command: ["echo", "Usa: docker compose run seed <comando>"]
+    command: ["echo", "Usa: docker compose run --rm seed <comando>"]
 
 volumes:
   node_modules_cache:
+  functions_node_modules_cache:
