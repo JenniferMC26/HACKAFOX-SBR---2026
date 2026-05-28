@@ -13,24 +13,15 @@ class MapPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.map_rounded,
-              size: 80,
-              color: AppColors.secondary.withOpacity(0.6),
-            ),
+            Icon(Icons.map_rounded, size: 80,
+              color: AppColors.secondary.withOpacity(0.6)),
             const SizedBox(height: 12),
-            Text(
-              label,
+            Text(label,
               style: TextStyle(
                 color: AppColors.secondary,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+                fontSize: 16)),
+          ])));
   }
 }
