@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:camino_front/shared/theme/app_colors.dart';
 
 class AlertBanner extends StatelessWidget {
   const AlertBanner({
