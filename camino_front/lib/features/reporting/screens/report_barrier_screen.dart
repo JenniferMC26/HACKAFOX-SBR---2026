@@ -175,7 +175,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                             ),
                             SizedBox(height: 8),
                             Text(
-                              "Toca para agregar foto",
+                              "Toca para abrir la cámara",
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFF9AA0A6),
@@ -186,45 +186,22 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.camera_alt_rounded),
-                      label: const Text("Cámara"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF4285F4),
-                        side: const BorderSide(color: Color(0xFF4285F4)),
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
-                        ),
-                      ),
-                      onPressed: () => setState(() => _photoSelected = true),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.photo_library_rounded),
-                      label: const Text("Galería"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF4285F4),
-                        side: const BorderSide(color: Color(0xFF4285F4)),
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
-                        ),
-                      ),
-                      onPressed: () => setState(() => _photoSelected = true),
-                    ),
-                  ),
-                ],
-              ),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  label: const Text("Tomar foto"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4285F4),
+                    side: const BorderSide(color: Color(0xFF4285F4)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(32))),
+                  onPressed: () => setState(() => _photoSelected = true))),
               const SizedBox(height: 24),
               Semantics(
                 button: true,
-                label: "Analizar foto con inteligencia artificial",
+                label: "Tomar foto con la cámara y analizar con inteligencia artificial",
                 child: SizedBox(
                   width: double.infinity,
                   height: 56,
