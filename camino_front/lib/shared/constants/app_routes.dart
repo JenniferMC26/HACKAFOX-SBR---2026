@@ -7,17 +7,17 @@ import 'package:camino_front/features/reporting/screens/barrier_confirmed_screen
 
 class AppRoutes {
   AppRoutes._();
-  static const home = '/';
+  static const home        = '/';
   static const routeDetails = '/route-details';
-  static const navigation = '/navigation';
+  static const navigation  = '/navigation';
   static const reportBarrier = '/report-barrier';
   static const barrierConfirmed = '/barrier-confirmed';
 
   static Map<String, WidgetBuilder> get routes => {
-    home: (_) => const MapScreen(),
-    routeDetails: (_) => const RouteDetailsScreen(),
-    navigation: (_) => const NavigationScreen(),
-    reportBarrier: (_) => const ReportBarrierScreen(),
+    home:             (_) => const MapScreen(),
+    routeDetails:     (_) => const RouteDetailsScreen(),
+    navigation:       (_) => const NavigationScreen(),
+    reportBarrier:    (_) => const ReportBarrierScreen(),
     barrierConfirmed: (_) => const BarrierConfirmedScreen(),
   };
 }
