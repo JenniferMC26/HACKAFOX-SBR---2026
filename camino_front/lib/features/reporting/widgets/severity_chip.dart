@@ -11,17 +11,10 @@ class SeverityChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: _bgColor(),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        '$level / 10',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: _textColor(),
-        ),
-      ),
-    );
+        borderRadius: BorderRadius.circular(20)),
+      child: Text('$level / 10',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+          color: _textColor())));
   }
 
   Color _bgColor() {
