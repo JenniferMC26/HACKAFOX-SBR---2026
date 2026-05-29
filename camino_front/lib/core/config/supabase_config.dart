@@ -18,6 +18,10 @@ class SupabaseConfig {
   // Groq API — Groq Cloud → API Keys
   static const groqApiKey = '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';
 
-  // Google Maps — Google Cloud Console → APIs & Services → Credentials
+  // Google Maps SDK (Android + Web) — Google Cloud Console → Credentials
   static const googleMapsApiKey = 'AIzaSyCjd1xBS1fJqOWOCyQTzCKL8wykQi9PaNI';
+
+  // Google Places API — key separada, solo con Places API habilitada
+  // Reemplaza este valor con tu nueva key de Places
+  static const placesApiKey = 'AIzaSyBmj2c3nXr0mg_cdD3bpNY0xPzr5h4w-r0';
 }

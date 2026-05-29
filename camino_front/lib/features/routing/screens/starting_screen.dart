@@ -1,6 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:camino_front/core/config/supabase_config.dart';
+import 'package:camino_front/core/services/location_service.dart';
 import 'package:camino_front/shared/services/permission_service.dart';
 import 'route_details_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
@@ -14,41 +22,269 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _locationGranted = false;
   LatLng? _currentPosition;
-  // ignore: unused_field
   bool _locationLoading = true;
+
+  // Mapa
+  GoogleMapController? _mapController;
+
+  // Blue dot
+  Set<Marker> _userMarker = {};
+  BitmapDescriptor? _blueDotDescriptor;
+  StreamSubscription<LatLng>? _positionSub;
+
+  // Places Autocomplete
+  List<Map<String, dynamic>> _suggestions = [];
+  Timer? _debounce;
+  bool _isFetchingSuggestions = false;
+
+  // Destinos frecuentes de Tijuana — fallback cuando Places API no responde.
+  static const _fallbackPlaces = [
+    {'place_id': 'fb_imss1', 'description': 'IMSS Clínica 1 Tijuana, Zona Río', 'main_text': 'IMSS Clínica 1 Tijuana', 'secondary_text': 'Blvd. Rodolfo Sánchez Taboada, Zona Río', 'lat': 32.5209, 'lng': -117.0261},
+    {'place_id': 'fb_hg', 'description': 'Hospital General de Tijuana', 'main_text': 'Hospital General de Tijuana', 'secondary_text': 'Av. Centenario 10851, La Mesa', 'lat': 32.5268, 'lng': -117.0189},
+    {'place_id': 'fb_ccultural', 'description': 'Centro Cultural Tijuana (CECUT)', 'main_text': 'Centro Cultural Tijuana (CECUT)', 'secondary_text': 'Paseo de los Héroes 9350, Zona Río', 'lat': 32.5259, 'lng': -117.0244},
+    {'place_id': 'fb_plaza_rio', 'description': 'Plaza Río Tijuana, Zona Río', 'main_text': 'Plaza Río Tijuana', 'secondary_text': 'Paseo de los Héroes 96, Zona Río', 'lat': 32.5262, 'lng': -117.0237},
+    {'place_id': 'fb_garita', 'description': 'Garita El Chaparral, Centro Tijuana', 'main_text': 'Garita El Chaparral', 'secondary_text': 'Frontera México–EE.UU., Centro', 'lat': 32.5332, 'lng': -117.0388},
+    {'place_id': 'fb_uabc', 'description': 'UABC Tijuana, Mesa de Otay', 'main_text': 'UABC Tijuana', 'secondary_text': 'Calzada Tecnológico 14418, Mesa de Otay', 'lat': 32.5411, 'lng': -116.9700},
+    {'place_id': 'fb_aero', 'description': 'Aeropuerto Internacional de Tijuana', 'main_text': 'Aeropuerto Internacional de Tijuana', 'secondary_text': 'Mesa de Otay', 'lat': 32.5411, 'lng': -116.9703},
+    {'place_id': 'fb_imss2', 'description': 'IMSS UMF 27 Tijuana, La Mesa', 'main_text': 'IMSS UMF 27 Tijuana', 'secondary_text': 'Av. La Mesa, La Mesa', 'lat': 32.5215, 'lng': -117.0021},
+    {'place_id': 'fb_parque', 'description': 'Parque Teniente Guerrero, Centro Tijuana', 'main_text': 'Parque Teniente Guerrero', 'secondary_text': 'Av. Primera, Centro', 'lat': 32.5283, 'lng': -117.0365},
+    {'place_id': 'fb_dif', 'description': 'DIF Municipal Tijuana, Zona Centro', 'main_text': 'DIF Municipal Tijuana', 'secondary_text': 'Av. Ocampo, Zona Centro', 'lat': 32.5271, 'lng': -117.0350},
+  ];
 
   @override
   void initState() {
     super.initState();
+    _initBlueDot();
     _requestPermissions();
-    _getCurrentLocation();
+    _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onFocusChanged);
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      setState(() {
-        _currentPosition = const LatLng(32.5149, -117.0382);
-        _locationLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _locationLoading = false);
+  // ── Blue dot ────────────────────────────────────────────────────────────
+
+  /// Dibuja el marcador azul con canvas — halo semitransparente + borde blanco
+  /// + punto azul central. Idéntico al dot de Google Maps.
+  Future<void> _initBlueDot() async {
+    const double size = 56;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2,
+        Paint()..color = const Color(0x334285F4));
+    canvas.drawCircle(const Offset(size / 2, size / 2), 15,
+        Paint()..color = Colors.white);
+    canvas.drawCircle(const Offset(size / 2, size / 2), 11,
+        Paint()..color = const Color(0xFF4285F4));
+
+    final img = await recorder
+        .endRecording()
+        .toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    if (bytes == null || !mounted) return;
+
+    setState(() => _blueDotDescriptor = BitmapDescriptor.fromBytes(
+          bytes.buffer.asUint8List(),
+          size: const Size(size, size),
+        ));
+
+    if (_currentPosition != null) _updateUserMarker(_currentPosition!);
+  }
+
+  void _updateUserMarker(LatLng position) {
+    if (_blueDotDescriptor == null || !mounted) return;
+    setState(() {
+      _userMarker = {
+        Marker(
+          markerId: const MarkerId('user_location'),
+          position: position,
+          icon: _blueDotDescriptor!,
+          anchor: const Offset(0.5, 0.5),
+          zIndex: 10,
+          infoWindow: InfoWindow.noText,
+          consumeTapEvents: false,
+        ),
+      };
+    });
+  }
+
+  /// Solo centra la cámara — sin re-fetchar GPS ni reiniciar el stream.
+  void _centerOnUser() {
+    if (_currentPosition != null) {
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _currentPosition!, zoom: 16),
+        ),
+      );
+    } else {
+      _moveToUserLocation();
     }
+  }
+
+  // ── Localización ────────────────────────────────────────────────────────
+
+  /// Obtiene la posición real, centra la cámara y arranca el stream.
+  Future<void> _moveToUserLocation() async {
+    final position = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    setState(() {
+      _currentPosition = position;
+      _locationGranted = true;
+      _locationLoading = false;
+    });
+    _updateUserMarker(position);
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: position, zoom: 16),
+      ),
+    );
+    _startPositionTracking();
+  }
+
+  /// Stream GPS en tiempo real — actualiza el dot sin mover la cámara.
+  void _startPositionTracking() {
+    _positionSub?.cancel();
+    _positionSub = LocationService.positionStream().listen(
+      (position) {
+        if (!mounted) return;
+        setState(() => _currentPosition = position);
+        _updateUserMarker(position);
+      },
+      onError: (_) {},
+      cancelOnError: false,
+    );
+  }
+
+  // ── Places Autocomplete ─────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> _filterFallback(String query) {
+    final q = query.toLowerCase();
+    return _fallbackPlaces
+        .where((p) =>
+            (p['main_text'] as String).toLowerCase().contains(q) ||
+            (p['secondary_text'] as String).toLowerCase().contains(q))
+        .map((p) => Map<String, dynamic>.from(p))
+        .toList();
+  }
+
+  void _onFocusChanged() {
+    if (_searchFocusNode.hasFocus && _suggestions.isEmpty) {
+      setState(() => _suggestions =
+          _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
+    } else if (!_searchFocusNode.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted && !_searchFocusNode.hasFocus) {
+          setState(() => _suggestions = []);
+        }
+      });
+    }
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    final query = _searchController.text.trim();
+
+    if (query.isEmpty) {
+      setState(() => _suggestions =
+          _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
+      return;
+    }
+
+    final local = _filterFallback(query);
+    setState(() => _suggestions = local.isNotEmpty
+        ? local
+        : _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
+
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _fetchSuggestions(query);
+    });
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    if (_isFetchingSuggestions) return;
+    setState(() => _isFetchingSuggestions = true);
+
+    try {
+      final lat = _currentPosition?.latitude ?? 32.5149;
+      final lng = _currentPosition?.longitude ?? -117.0382;
+
+      final uri = Uri.https(
+        'maps.googleapis.com',
+        '/maps/api/place/autocomplete/json',
+        {
+          'input': query,
+          'key': SupabaseConfig.placesApiKey,
+          'components': 'country:mx',
+          'language': 'es',
+          'location': '$lat,$lng',
+          'radius': '50000',
+        },
+      );
+
+      final response = await http.get(uri);
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final predictions = data['predictions'] as List<dynamic>? ?? [];
+        final results = predictions.cast<Map<String, dynamic>>().map((p) => {
+              'place_id': p['place_id'] as String,
+              'description': p['description'] as String,
+              'main_text':
+                  (p['structured_formatting']?['main_text'] as String?) ??
+                      (p['description'] as String),
+              'secondary_text':
+                  (p['structured_formatting']?['secondary_text'] as String?) ??
+                      '',
+            }).toList();
+
+        if (results.isNotEmpty) setState(() => _suggestions = results);
+      }
+    } catch (_) {
+      // Sin red o CORS → fallback local ya visible.
+    } finally {
+      if (mounted) setState(() => _isFetchingSuggestions = false);
+    }
+  }
+
+  Future<void> _selectPlace(Map<String, dynamic> suggestion) async {
+    setState(() {
+      _suggestions = [];
+      _searchController.text = suggestion['main_text'] as String;
+    });
+    _searchFocusNode.unfocus();
+
+    if (suggestion.containsKey('lat') && suggestion.containsKey('lng')) {
+      // Fallback local — coordenadas embebidas, sin llamada extra.
+    }
+    // Para lugares reales, Places Details usaría también placesApiKey,
+    // pero la navegación ya funciona con el nombre.
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RouteDetailsScreen(
+          destination: suggestion['description'] as String,
+        ),
+      ),
+    );
   }
 
   Future<void> _requestPermissions() async {
     if (kIsWeb) {
-      setState(() => _locationGranted = true);
+      // En web, geolocator pide permiso al browser automáticamente.
+      await _moveToUserLocation();
       return;
     }
     final granted = await PermissionService.requestLocationPermission();
     if (!mounted) return;
     setState(() => _locationGranted = granted);
-    if (!granted) {
+    if (granted) {
+      _moveToUserLocation();
+    } else {
       _showPermissionDialog();
     }
   }
@@ -167,7 +403,13 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _positionSub?.cancel();
+    _searchController.removeListener(_onSearchChanged);
+    _searchFocusNode.removeListener(_onFocusChanged);
+    _mapController?.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -178,101 +420,213 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           // Map Background
           GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _currentPosition ?? const LatLng(32.5149, -117.0382),
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(32.5149, -117.0382),
               zoom: 15.0,
             ),
             onMapCreated: (controller) {
+              _mapController = controller;
               if (_currentPosition != null) {
                 controller.animateCamera(
                   CameraUpdate.newCameraPosition(
-                    CameraPosition(
-                      target: _currentPosition!,
-                      zoom: 15.0,
-                    ),
+                    CameraPosition(target: _currentPosition!, zoom: 16),
                   ),
                 );
               }
             },
-            markers: _currentPosition == null
-                ? {}
-                : {
-                    Marker(
-                      markerId: const MarkerId('current_location'),
-                      position: _currentPosition!,
-                      infoWindow: const InfoWindow(
-                        title: '📍 Tu ubicación actual',
-                        snippet: 'Centro, Tijuana',
-                      ),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueAzure,
-                      ),
-                    ),
-                  },
-            myLocationEnabled: _locationGranted,
+            // Android → dot nativo con pulso. Web → marcador canvas dibujado.
+            myLocationEnabled: !kIsWeb && _locationGranted,
             myLocationButtonEnabled: false,
+            markers: kIsWeb ? _userMarker : {},
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             compassEnabled: false,
           ),
 
-          // Floating Input Field
+          // Floating Input Field + Suggestions
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Barra de búsqueda ──
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4.0,
-                  vertical: 4.0,
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Ingrese su destino...',
-                    hintStyle: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.location_on,
-                      color: Color(0xFF4285F4),
-                      size: 28,
-                    ),
-                    suffixIcon: IconButton(
-                      icon: const Icon(
-                        Icons.mic_rounded,
-                        color: Color(0xFF4285F4),
-                        size: 28,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0, vertical: 4.0),
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: 'Ingrese su destino...',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                        prefixIcon: _isFetchingSuggestions
+                            ? const Padding(
+                                padding: EdgeInsets.all(14),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF4285F4)),
+                                ),
+                              )
+                            : const Icon(Icons.location_on,
+                                color: Color(0xFF4285F4), size: 28),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    color: Color(0xFF9AA0A6), size: 22),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _suggestions = _fallbackPlaces
+                                      .map((p) =>
+                                          Map<String, dynamic>.from(p))
+                                      .toList());
+                                },
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.mic_rounded,
+                                    color: Color(0xFF4285F4), size: 28),
+                                onPressed: _requestMicPermission,
+                              ),
+                        border: InputBorder.none,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: _requestMicPermission,
                     ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+
+                  // ── Panel de sugerencias ──
+                  if (_suggestions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _suggestions.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, indent: 48,
+                              color: Color(0xFFF1F3F4)),
+                          itemBuilder: (_, i) {
+                            final s = _suggestions[i];
+                            return InkWell(
+                              onTap: () => _selectPlace(s),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.place_rounded,
+                                        color: Color(0xFF4285F4), size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            s['main_text'] as String,
+                                            style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if ((s['secondary_text'] as String)
+                                              .isNotEmpty)
+                                            Text(
+                                              s['secondary_text'] as String,
+                                              style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // FAB — centrar en mi ubicación
+          Positioned(
+            bottom: 190,
+            right: 20,
+            child: Semantics(
+              button: true,
+              label: 'Centrar mapa en mi ubicación actual',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _centerOnUser,
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.10),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.my_location_rounded,
+                      color: Color(0xFF4285F4),
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
 
-          // Floating Report Button
-          // MODIFICACIÓN: Se agregó un FAB secundario para reportar barreras usando el color
-          // amarillo Google (#FBBC04). Se envolvió en Semantics para lectores de pantalla.
+          // FAB — reportar barrera
           Positioned(
             bottom: 120,
             right: 20,
@@ -339,10 +693,13 @@ class _MapScreenState extends State<MapScreen> {
                       );
                       return;
                     }
+                    setState(() => _suggestions = []);
+                    _searchFocusNode.unfocus();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => RouteDetailsScreen(destination: destination),
+                        builder: (_) =>
+                            RouteDetailsScreen(destination: destination),
                       ),
                     );
                   },
