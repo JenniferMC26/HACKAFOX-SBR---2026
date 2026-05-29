@@ -12,7 +12,7 @@ const {
   MAX_REPORTS_PER_HOUR,
   TJ_BOUNDS,
 } = require('../shared/constants');
-const { analyzeBarrierPhoto } = require('./geminiVision');
+const { analyzeBarrierPhoto, analyzeBarrierBase64 } = require('./geminiVision');
 
 function validatePhotoUrl(photoUrl) {
   if (!process.env.SUPABASE_URL) return false;
@@ -42,7 +42,7 @@ async function insertHistory(table, row) {
   if (error) console.error(`${table}.insert:`, error.message);
 }
 
-async function submitReport({ uid, lat, lng, photoUrl, weather }) {
+async function submitReport({ uid, lat, lng, photoUrl, base64, mimeType, weather }) {
   // 1. Validaciones
   if (
     !Number.isFinite(lat) || !Number.isFinite(lng) ||
@@ -53,8 +53,13 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
     err.statusCode = 400;
     throw err;
   }
-  if (!validatePhotoUrl(photoUrl)) {
+  if (!base64 && !validatePhotoUrl(photoUrl)) {
     const err = new Error('photoUrl no pertenece al bucket autorizado');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (base64 && !mimeType) {
+    const err = new Error('mimeType requerido cuando se envía base64');
     err.statusCode = 400;
     throw err;
   }
@@ -68,7 +73,9 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
   }
 
   // 3. Gemini
-  const analysis = await analyzeBarrierPhoto(photoUrl);
+  const analysis = base64
+    ? await analyzeBarrierBase64(base64, mimeType)
+    : await analyzeBarrierPhoto(photoUrl);
   const score = severityToScore(analysis.severity);
   const requiresHumanReview = analysis.confidence < GEMINI_MIN_CONFIDENCE;
 

@@ -86,4 +86,41 @@ async function analyzeBarrierPhoto(photoUrl) {
   }
 }
 
-module.exports = { analyzeBarrierPhoto };
+async function analyzeBarrierBase64(base64Data, mimeType) {
+  if (USE_MOCK_GEMINI) return mockAnalysis(base64Data);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: PROMPT },
+          { inline_data: { mime_type: mimeType || 'image/jpeg', data: base64Data } },
+        ],
+      }],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gemini API ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(`Gemini no devolvió JSON parseable: ${text.slice(0, 200)}`);
+  }
+}
+
+module.exports = { analyzeBarrierPhoto, analyzeBarrierBase64 };

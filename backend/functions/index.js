@@ -50,11 +50,14 @@ exports.routingAccessible = wrap(async (req, res) => {
 exports.reportSubmit = wrap(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!(await requireAuth(req, res))) return;
-  const { lat, lng, photoUrl, weather } = req.body || {};
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !photoUrl) {
-    return res.status(400).json({ error: 'lat, lng y photoUrl requeridos' });
+  const { lat, lng, photoUrl, base64, mimeType, weather } = req.body || {};
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return res.status(400).json({ error: 'lat y lng requeridos' });
   }
-  const result = await submitReport({ uid: req.uid, lat, lng, photoUrl, weather });
+  if (!photoUrl && !base64) {
+    return res.status(400).json({ error: 'photoUrl o base64 requerido' });
+  }
+  const result = await submitReport({ uid: req.uid, lat, lng, photoUrl, base64, mimeType, weather });
   res.json(result);
 });
 

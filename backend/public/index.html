@@ -245,7 +245,22 @@ input:focus { outline:none; border-color:var(--brand); }
           <div class="field"><label>Longitud</label><input id="rep-lng" type="number" step="any"></div>
           <button class="loc-btn" onclick="fillLoc('rep-lat','rep-lng')">📍</button>
         </div>
-        <div class="field"><label>Foto de la barrera</label><input id="rep-file" type="file" accept="image/*" capture="environment"></div>
+        <div class="field">
+          <label>Foto de la barrera (cámara)</label>
+          <!-- Stream de cámara (getUserMedia) -->
+          <div id="cam-wrap" style="position:relative;border-radius:8px;overflow:hidden;background:#000;display:none">
+            <video id="cam-video" autoplay playsinline style="width:100%;display:block"></video>
+            <canvas id="cam-canvas" style="display:none"></canvas>
+          </div>
+          <!-- Fallback: input file con capture (abre cámara en móvil) -->
+          <input id="cam-file-fallback" type="file" accept="image/*" capture="environment" style="display:none" onchange="onFallbackFile(this)">
+          <img id="cam-preview" style="display:none;width:100%;border-radius:8px;margin-top:4px" alt="Captura">
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn btn-ghost" style="flex:1;padding:8px" id="btn-cam-open" onclick="openCamera()">📷 Abrir cámara</button>
+            <button class="btn btn-primary" style="flex:1;padding:8px;display:none" id="btn-cam-snap" onclick="snapPhoto()">📸 Capturar</button>
+            <button class="btn btn-anon" style="flex:0 0 auto;padding:8px 12px;display:none" id="btn-cam-retry" onclick="retryCamera()">🔄</button>
+          </div>
+        </div>
         <button class="btn btn-primary" style="margin-top:8px" onclick="submitReport()">Enviar reporte</button>
         <div id="rep-out" class="out" style="display:none"></div>
       </div>
@@ -307,7 +322,7 @@ const RV_MIN = 3, RV_R = 200, RV_HW = 0.7, RV_RW = 0.3;
 const THOLD = { wheelchair:6, elderly:4, cane:3, stroller:3, none:2 };
 const AVOID = { wheelchair:['broken_ramp','missing_ramp','no_curb_cut'], elderly:['missing_ramp'], cane:[], stroller:[], none:[] };
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let sb, session, gmap, mapReady=false, selMobility='none';
@@ -615,24 +630,109 @@ function scoreRoute(nodes,profile){
   return{score:Math.round(tot/wt*10)/10,warnings:warns};
 }
 
+// ── Camera ───────────────────────────────────────────────────────────────────
+let camStream=null, capturedB64=null, capturedMime=null, camPermission='unknown';
+
+(async()=>{
+  try {
+    const status=await navigator.permissions.query({name:'camera'});
+    camPermission=status.state;
+    status.onchange=()=>{camPermission=status.state;};
+  } catch(_){}
+})();
+
+window.openCamera = () => {
+  capturedB64=null; capturedMime=null;
+  document.getElementById('cam-preview').style.display='none';
+  if(camPermission==='granted'){
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
+      .then(stream=>{
+        camStream=stream;
+        const video=document.getElementById('cam-video');
+        video.srcObject=stream;
+        document.getElementById('cam-wrap').style.display='block';
+        document.getElementById('btn-cam-open').style.display='none';
+        document.getElementById('btn-cam-snap').style.display='';
+        document.getElementById('btn-cam-retry').style.display='none';
+      })
+      .catch(()=>toast('Error al abrir la cámara'));
+  } else {
+    document.getElementById('cam-file-fallback').click();
+  }
+};
+
+window.onFallbackFile = (input) => {
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    capturedMime=file.type||'image/jpeg';
+    capturedB64=reader.result.split(',')[1];
+    const preview=document.getElementById('cam-preview');
+    preview.src=reader.result;
+    preview.style.display='block';
+    document.getElementById('btn-cam-open').style.display='none';
+    document.getElementById('btn-cam-retry').style.display='';
+    fillRepLoc();
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+};
+
+function fillRepLoc(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    p=>{set('rep-lat',p.coords.latitude.toFixed(6));set('rep-lng',p.coords.longitude.toFixed(6));},
+    ()=>{}
+  );
+}
+
+window.snapPhoto = () => {
+  const video=document.getElementById('cam-video');
+  const canvas=document.getElementById('cam-canvas');
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  capturedMime='image/jpeg';
+  capturedB64=canvas.toDataURL(capturedMime,0.85).split(',')[1];
+  stopCamStream();
+  document.getElementById('cam-wrap').style.display='none';
+  const preview=document.getElementById('cam-preview');
+  preview.src='data:'+capturedMime+';base64,'+capturedB64;
+  preview.style.display='block';
+  document.getElementById('btn-cam-snap').style.display='none';
+  document.getElementById('btn-cam-retry').style.display='';
+  document.getElementById('btn-cam-open').style.display='none';
+  fillRepLoc();
+};
+
+window.retryCamera = () => {
+  capturedB64=null; capturedMime=null;
+  document.getElementById('cam-preview').style.display='none';
+  document.getElementById('btn-cam-retry').style.display='none';
+  openCamera();
+};
+
+function stopCamStream(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 window.submitReport = async () => {
   if(!session){toast('Inicia sesión primero');return;}
-  const lat=flt('rep-lat'), lng=flt('rep-lng'), file=document.getElementById('rep-file').files[0];
+  const lat=flt('rep-lat'), lng=flt('rep-lng');
   const outEl=document.getElementById('rep-out');
   if(!fin(lat)||!fin(lng)){toast('Ingresa coordenadas');return;}
-  if(!file){toast('Selecciona una foto');return;}
+  if(!capturedB64){toast('Toma una foto con la cámara');return;}
   if(lat<TJ.latMin||lat>TJ.latMax||lng<TJ.lngMin||lng>TJ.lngMax){toast('Fuera de Tijuana');return;}
   outEl.style.display='block'; outEl.textContent='⏳ Analizando con Gemini…';
   try {
     const uid=session.user.id;
-    const{base64,mime}=await toB64(file);
-    const a=await gemini(base64,mime);
+    const a=await gemini(capturedB64,capturedMime);
     const score=10-a.severity;
     outEl.textContent=`⏳ Subiendo foto… (severidad ${a.severity}/10)`;
-    const ext=file.name.split('.').pop()||'jpg';
-    const path=`${uid}/${crypto.randomUUID()}.${ext}`;
-    const{error:upErr}=await sb.storage.from('reports').upload(path,file,{contentType:mime});
+    const blob=b64toBlob(capturedB64,capturedMime);
+    const path=`${uid}/${crypto.randomUUID()}.jpg`;
+    const{error:upErr}=await sb.storage.from('reports').upload(path,blob,{contentType:capturedMime});
     if(upErr) throw new Error('Storage: '+upErr.message);
     const{data:sg,error:sgErr}=await sb.storage.from('reports').createSignedUrl(path,3600);
     if(sgErr) throw new Error('SignedUrl: '+sgErr.message);
@@ -671,6 +771,10 @@ window.submitReport = async () => {
     if(ticketId) h+=`<div class="irow2">🎫 Ticket: <b>${ticketId}</b></div>`;
     if(a.confidence<MIN_CONF) h+=`<span class="tag twn">⚠ Revisión humana requerida</span>`;
     outEl.innerHTML=h;
+    capturedB64=null; capturedMime=null;
+    document.getElementById('cam-preview').style.display='none';
+    document.getElementById('btn-cam-retry').style.display='none';
+    document.getElementById('btn-cam-open').style.display='';
   } catch(e){ outEl.textContent='❌ '+e.message; }
 };
 
@@ -681,7 +785,7 @@ Devuelve SOLO JSON (sin markdown):
 "severity":1,"passable":true,"confidence":0.9,"description":"breve en español","affectedProfiles":["wheelchair"]}
 severity: 1=sin problema, 10=completamente bloqueado.`;
   const res=await fetch(GEMINI_URL,{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':GEMINI_API_KEY},
     body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],
       generationConfig:{temperature:0.1}}),
   });
@@ -691,7 +795,7 @@ severity: 1=sin problema, 10=completamente bloqueado.`;
   t=t.replace(/```json\n?|\n?```/g,'').trim();
   return JSON.parse(t);
 }
-function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{res({base64:r.result.split(',')[1],mime:file.type});};r.onerror=rej;r.readAsDataURL(file);});}
+function b64toBlob(b64,mime){const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
 
 // ── Ruta Viva ──────────────────────────────────────────────────────────────
 window.getRutaViva = async () => {
