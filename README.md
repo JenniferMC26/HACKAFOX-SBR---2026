@@ -237,14 +237,48 @@ PASO está construido siguiendo los estándares **WCAG AA**:
 ---
 
 ## 👥 Equipo — Hackafox 2026
- 
+
 | Rol | Integrante | GitHub |
 |-----|-----------|--------|
 | Frontend Developer | Jennifer MC | [@JenniferMC26](https://github.com/JenniferMC26) |
 | Frontend Developer | Prina Meredith | [@MerelyMeredith](https://github.com/MerelyMeredith) |
 | Backend Developer | Angel Castro | [@Tenshi145](https://github.com/Tenshi145) |
 | Backend Developer | Yael Kristoph Triana Sánchez | [@YaelTriana](https://github.com/YaelTriana) |
- 
+
+---
+
+## 🏆 Hackafox 2026 — Criterios de evaluación
+
+| Criterio | Cómo PASO lo cumple |
+|----------|-------------------|
+| **Impacto social** | Beneficia a 170,000 personas con discapacidad motriz en Tijuana + adultos mayores y familias |
+| **Funcionalidad técnica** | Demo funcional con Google Maps real, cámara, permisos y flujo completo en Android y Web |
+| **Innovación** | Ruteo por perfil de movilidad + reporte ciudadano con IA + botón de pánico — combinación única |
+| **Calidad del código** | Screaming Architecture, widgets reutilizables, sistema de diseño, 0 errores en flutter analyze |
+| **Pitch y presentación** | Flujo demo completo: login → mapa → ruta → navegación → reporte → confirmación |
+
+---
+
+## 📋 Track 01 — Tijuana Sin Barreras
+
+**Reto:** Crear una solución de accesibilidad multimodal para servicios públicos en Tijuana.
+
+PASO responde directamente al reto con:
+- ✅ Plataforma de ruteo accesible en tiempo real
+- ✅ Trayectos seguros personalizados por tipo de movilidad
+- ✅ Reporte ciudadano de barreras físicas con foto y ubicación
+- ✅ Mapa vivo actualizado por la comunidad en tiempo real
+
+### Checklist de entrega Devpost
+- [x] Demo funcional del prototipo
+- [x] Repositorio de código — [github.com/JenniferMC26/HACKAFOX-SBR---2026](https://github.com/JenniferMC26/HACKAFOX-SBR---2026)
+- [x] Explicación clara de la solución
+- [x] Track seleccionado — Track 01: Tijuana Sin Barreras
+- [x] Tecnologías utilizadas
+- [x] Evidencia visual del proyecto
+- [x] Descripción del impacto social esperado
+- [x] Presentación o pitch final
+
 ---
 
 ## 📄 Licencia
