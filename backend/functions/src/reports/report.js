@@ -1,8 +1,8 @@
 // Puente Ciudadano — recibe un reporte (foto ya subida a Supabase Storage), lo
-// analiza con Gemini, hace upsert atómico en accessibility_nodes, dispara
-// escritura a BigQuery + ticket cívico si severity >= 7.
+// analiza con Gemini, hace upsert atómico en accessibility_nodes, e inserta el
+// espejo histórico en accessibility_reports + ticket cívico si severity >= 7.
 
-const { supabase, bigquery, BQ_DATASET } = require('../shared/clients');
+const { supabase } = require('../shared/clients');
 const { upsertNodeNear, nextTicketId } = require('../shared/nodeUtils');
 const {
   severityToScore,
@@ -14,11 +14,8 @@ const {
 } = require('../shared/constants');
 const { analyzeBarrierPhoto } = require('./geminiVision');
 
-const USE_MOCK_BQ = !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.GCLOUD_PROJECT_PROD;
-
 function validatePhotoUrl(photoUrl) {
   if (!process.env.SUPABASE_URL) return false;
-  // Acepta URL pública y signed-url; ambas empiezan con el host del proyecto.
   const baseHost = process.env.SUPABASE_URL.replace(/\/$/, '');
   const allowed = [
     `${baseHost}/storage/v1/object/public/reports/`,
@@ -39,16 +36,10 @@ async function checkRateLimit(uid) {
   return (count || 0) < MAX_REPORTS_PER_HOUR;
 }
 
-async function writeToBigQuery(table, row) {
-  if (USE_MOCK_BQ) {
-    console.log(`[mock-bq] insert ${BQ_DATASET}.${table}:`, JSON.stringify(row));
-    return;
-  }
-  try {
-    await bigquery.dataset(BQ_DATASET).table(table).insert([row]);
-  } catch (err) {
-    console.error(`BigQuery insert ${table} falló:`, err.message);
-  }
+// Fire-and-forget — un fallo aquí no debe bloquear la respuesta al cliente.
+async function insertHistory(table, row) {
+  const { error } = await supabase.from(table).insert(row);
+  if (error) console.error(`${table}.insert:`, error.message);
 }
 
 async function submitReport({ uid, lat, lng, photoUrl, weather }) {
@@ -81,7 +72,7 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
   const score = severityToScore(analysis.severity);
   const requiresHumanReview = analysis.confidence < GEMINI_MIN_CONFIDENCE;
 
-  // 4. Upsert atómico en accessibility_nodes (la función SQL hace LOCK + UPDATE o INSERT)
+  // 4. Upsert atómico en accessibility_nodes
   const node = await upsertNodeNear({
     lat,
     lng,
@@ -118,9 +109,9 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
     .single();
   if (reportErr) throw new Error(`reports.insert: ${reportErr.message}`);
 
-  // 7. Espejos en BigQuery (fire-and-forget)
+  // 7. Espejo histórico en accessibility_reports (fire-and-forget)
   const now = new Date();
-  writeToBigQuery('accessibility_reports', {
+  insertHistory('accessibility_reports', {
     report_id: reportRow.id,
     user_id: uid,
     lat,
@@ -132,8 +123,10 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
     weather_condition: weather || null,
     reported_at: reportRow.created_at,
   });
+
+  // 8. Ticket cívico (fire-and-forget)
   if (ticketId) {
-    writeToBigQuery('civic_tickets', {
+    insertHistory('civic_tickets', {
       ticket_id: ticketId,
       report_id: reportRow.id,
       lat,
