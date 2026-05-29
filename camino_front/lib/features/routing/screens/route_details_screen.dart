@@ -23,35 +23,35 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     setState(() {
-      _foundLocation = "Santiago de Compostela Cathedral";
+      _foundLocation = "IMSS Clínica 1 — Tijuana";
       _isLoading = false;
     });
   }
 
   Map<String, Map<String, String>> get _routeDetailsData => {
     "Estandar": {
-      "time": "11 min",
-      "distance": "0.9 km",
+      "time": "18 min",
+      "distance": "1.4 km",
       "desc":
-          "Ruta directa más corto. Incluye aceras estándar, dos cruces peatonales y un tramo de escaleras de arquitectura pública.",
+          "Ruta directa por Av. Revolución. Incluye dos cruces peatonales con semáforo y banquetas en buen estado.",
     },
     "Silla de ruedas": {
-      "time": "16 min",
-      "distance": "1.3 km",
+      "time": "24 min",
+      "distance": "1.8 km",
       "desc":
-          "Ruta optimizada sin obstáculos. Evita adoquines y pendientes pronunciadas. Cuenta con rebajes 100% accesibles y cruces con rampas automatizadas.",
+          "Ruta accesible por Calle 3ra. Evita el desnivel de Av. Constitución. Rampas verificadas en todos los cruces.",
     },
     "Baston": {
-      "time": "14 min",
-      "distance": "1.1 km",
+      "time": "21 min",
+      "distance": "1.6 km",
       "desc":
-          "Ruta prioritaria con pavimento táctil. Senderos guía continuos totalmente mapeados con semáforos asistidos por audio en las intersecciones principales.",
+          "Ruta con pavimento táctil por Blvd. Agua Caliente. Semáforos con señal de audio en intersecciones principales.",
     },
     "Andadera": {
-      "time": "18 min",
-      "distance": "1.0 km",
+      "time": "26 min",
+      "distance": "1.5 km",
       "desc":
-          "Ruta de baja fatiga. Evita pendientes pronunciadas y terrenos irregulares. Destaca bancos de descanso regulares espaciados cada 150 metros.",
+          "Ruta de baja fatiga por Av. Sánchez Taboada. Bancos de descanso cada 200 metros. Sin pendientes pronunciadas.",
     },
   };
 

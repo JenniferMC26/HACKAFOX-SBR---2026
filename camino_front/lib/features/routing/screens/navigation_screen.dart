@@ -11,9 +11,9 @@ class NavigationScreen extends StatefulWidget {
 
 class _NavigationScreenState extends State<NavigationScreen> {
   final bool _hasAlert = true;
-  final String _destination = "IMSS Clínica 1";
-  final String _mobilityMode = "Bastón";
-  final String _alertMessage = "Rampa bloqueada · 80m adelante";
+  final String _destination = "IMSS Clínica 1 — Tijuana";
+  final String _mobilityMode = "Silla de ruedas";
+  final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +34,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    "Ruta activa · Centro, Tijuana",
+                    "Ruta activa · IMSS Clínica 1, Centro TJ",
                     style: TextStyle(
                       color: Color(0xFF9AA0A6),
                       fontWeight: FontWeight.w600,

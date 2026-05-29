@@ -22,10 +22,10 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
     if (!mounted) return;
     setState(() {
       _state = _ReportState.result;
-      _barrierType = "Rampa destruida";
-      _severityLevel = 7;
+      _barrierType = "Banqueta destruida";
+      _severityLevel = 8;
       _analysisDescription =
-          "Daño estructural en rampa de acceso peatonal. Alta severidad para usuarios de silla de ruedas y andadera. Requiere intervención municipal. Estimado: permanente.";
+          "Se detecta daño severo en banqueta peatonal. Bloqueo total del paso para silla de ruedas y andadera. Ubicación: Calle 3ra entre Av. Revolución y Constitución, Centro Tijuana. Requiere intervención municipal urgente.";
     });
   }
 
@@ -385,7 +385,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                   ),
                   SizedBox(width: 6),
                   Text(
-                    "Capturada automáticamente · Centro, TJ",
+                    "Capturada automáticamente · Calle 3ra, Centro Tijuana",
                     style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),
                 ],
