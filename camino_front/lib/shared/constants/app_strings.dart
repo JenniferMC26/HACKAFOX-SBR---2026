@@ -2,7 +2,7 @@ class AppStrings {
   AppStrings._();
 
   // General
-  static const appName          = 'VíaLibre TJ';
+  static const appName          = 'PASO';
   static const loading          = 'Cargando...';
   static const cancel           = 'Cancelar';
   static const confirm          = 'Confirmar';
