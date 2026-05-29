@@ -1,29 +1,12 @@
 // Config pública del SDK cliente Supabase.
-//
-// La URL y la anon key se obtienen del endpoint /config de las Cloud Functions
-// (que las lee de .env). Así no hay nada hardcoded en archivos versionados.
+// Ya no depende del emulador de Firebase Functions — lee directamente de config.js.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_MAPS_API_KEY } from './config.js';
 
-export const FUNCTIONS_BASE =
-  location.hostname === 'localhost'
-    ? 'http://localhost:5001/paso/us-central1'
-    : 'https://us-central1-paso.cloudfunctions.net';
+export { GOOGLE_MAPS_API_KEY };
 
-// Fetch config from backend. Lanza si /config no responde o falta alguna key.
-async function loadConfig() {
-  const res = await fetch(`${FUNCTIONS_BASE}/config`);
-  if (!res.ok) throw new Error(`/config ${res.status}`);
-  const cfg = await res.json();
-  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
-    throw new Error('/config devolvió valores vacíos — revisa SUPABASE_URL / SUPABASE_ANON_KEY en .env');
-  }
-  return cfg;
-}
-
-const cfg = await loadConfig();
-
-export const supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

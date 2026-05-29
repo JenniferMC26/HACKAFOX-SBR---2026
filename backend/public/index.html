@@ -1,272 +1,708 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Paso — Test Console</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #222; }
-    header { background: #1f3a5f; color: #fff; padding: 14px 22px; display: flex; align-items: center; gap: 16px; }
-    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    header .uid { font-family: monospace; font-size: 12px; opacity: 0.85; }
-    nav { background: #fff; border-bottom: 1px solid #e3e6ea; padding: 0 22px; display: flex; gap: 4px; }
-    nav button { background: none; border: none; padding: 12px 16px; cursor: pointer; font-size: 14px; color: #555; border-bottom: 2px solid transparent; }
-    nav button.active { color: #1f3a5f; border-bottom-color: #1f3a5f; font-weight: 600; }
-    main { padding: 22px; max-width: 980px; margin: 0 auto; }
-    section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06); display: none; }
-    section.active { display: block; }
-    h2 { margin: 0 0 14px; font-size: 16px; color: #1f3a5f; }
-    label { display: block; font-size: 12px; color: #555; margin-top: 10px; }
-    input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ccd2da; border-radius: 5px; font-size: 14px; font-family: inherit; }
-    textarea { min-height: 60px; resize: vertical; }
-    .row { display: flex; gap: 10px; }
-    .row > * { flex: 1; }
-    button.primary { margin-top: 14px; background: #1f3a5f; color: #fff; border: none; padding: 10px 18px; border-radius: 5px; font-size: 14px; cursor: pointer; }
-    button.primary:hover { background: #2a4f80; }
-    pre { background: #0e1422; color: #d4e0f0; padding: 14px; border-radius: 5px; font-size: 12px; overflow: auto; max-height: 320px; margin-top: 14px; }
-    .hint { font-size: 12px; color: #777; margin-top: 4px; }
-    .badge { display: inline-block; padding: 2px 8px; background: #ffeec0; color: #6b4500; border-radius: 10px; font-size: 11px; margin-left: 6px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paso — Ruteo Accesible</title>
+<style>
+:root {
+  --brand: #1565c0;
+  --ok: #2e7d32;
+  --warn: #e65100;
+  --danger: #c62828;
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --text: #212121;
+  --muted: #757575;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100dvh; overflow: hidden; }
+
+.screen { display: none; width: 100%; height: 100dvh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* LOGIN */
+#s-login { justify-content: center; align-items: center; background: linear-gradient(135deg,#1565c0,#0d47a1); }
+.login-card { background:#fff; border-radius:var(--radius); padding:32px 24px; width:100%; max-width:380px; box-shadow:var(--shadow); }
+.login-logo { text-align:center; margin-bottom:24px; }
+.login-logo h1 { font-size:2.2rem; font-weight:800; color:var(--brand); letter-spacing:-1px; }
+.login-logo p { color:var(--muted); font-size:.85rem; margin-top:4px; }
+.auth-tabs { display:flex; border-bottom:2px solid #e0e0e0; margin-bottom:20px; }
+.auth-tab { flex:1; padding:10px; background:none; border:none; cursor:pointer; font-size:.9rem; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-2px; }
+.auth-tab.active { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
+.auth-pane { display:none; }
+.auth-pane.active { display:block; }
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:4px; }
+.field input, select { width:100%; padding:10px 12px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:.9rem; background:#fff; color:var(--text); }
+.field input:focus, select:focus { outline:none; border-color:var(--brand); }
+.btn { display:block; width:100%; padding:12px; border:none; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn-primary { background:var(--brand); color:#fff; }
+.btn-ghost { background:transparent; color:var(--brand); border:1.5px solid var(--brand); margin-top:8px; }
+.btn-anon { background:transparent; color:var(--muted); border:1.5px solid #e0e0e0; margin-top:8px; }
+#auth-error { color:var(--danger); font-size:.82rem; margin-top:8px; min-height:18px; }
+
+/* PROFILE */
+#s-profile { justify-content:center; align-items:center; }
+.profile-card { background:#fff; border-radius:var(--radius); padding:32px 24px; width:100%; max-width:400px; box-shadow:var(--shadow); }
+.profile-card h2 { font-size:1.4rem; font-weight:700; margin-bottom:6px; }
+.profile-card p { color:var(--muted); font-size:.85rem; margin-bottom:20px; }
+.mob-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+.mob-btn { padding:14px 8px; border:2px solid #e0e0e0; border-radius:10px; background:#fff; cursor:pointer; text-align:center; font-size:.82rem; transition:all .15s; }
+.mob-btn:hover { border-color:var(--brand); }
+.mob-btn.sel { border-color:var(--brand); background:#e3f2fd; color:var(--brand); font-weight:600; }
+.mob-btn .ic { font-size:1.6rem; display:block; margin-bottom:4px; }
+.mob-full { grid-column:span 2; }
+
+/* APP */
+#s-app { position:relative; }
+#topbar { display:flex; align-items:center; padding:10px 16px; background:var(--brand); color:#fff; flex-shrink:0; gap:8px; }
+#topbar .logo { font-size:1.3rem; font-weight:800; flex:1; }
+#user-label { font-size:.75rem; opacity:.85; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#btn-logout { background:rgba(255,255,255,.15); border:none; color:#fff; padding:5px 10px; border-radius:6px; font-size:.75rem; cursor:pointer; }
+#map-wrap { flex:1; position:relative; min-height:0; }
+#map { width:100%; height:100%; }
+#map-ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:.9rem; background:#e8f0fe; }
+
+/* PANEL */
+#panel { background:#fff; border-radius:18px 18px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,.12); flex-shrink:0; max-height:55vh; display:flex; flex-direction:column; }
+#ph-row { text-align:center; padding:8px 0 4px; cursor:pointer; }
+#ph { display:inline-block; width:36px; height:4px; background:#e0e0e0; border-radius:2px; }
+#panel-tabs { display:flex; border-bottom:1px solid #f0f0f0; }
+.ptab { flex:1; padding:8px 4px; background:none; border:none; cursor:pointer; font-size:.68rem; color:var(--muted); border-bottom:2px solid transparent; display:flex; flex-direction:column; align-items:center; gap:2px; }
+.ptab .ti { font-size:1.1rem; }
+.ptab.active { color:var(--brand); border-bottom-color:var(--brand); }
+#panel-body { flex:1; overflow-y:auto; padding:14px 16px 20px; }
+.pane { display:none; }
+.pane.active { display:block; }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.irow { display:flex; gap:6px; align-items:flex-end; margin-bottom:8px; }
+.irow .field { flex:1; margin-bottom:0; }
+.loc-btn { padding:10px; background:var(--brand); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:1rem; flex-shrink:0; height:38px; }
+input[type=number], input[type=text], input[type=email], input[type=password], input[type=datetime-local], input[type=file] { width:100%; padding:8px 10px; border:1.5px solid #e0e0e0; border-radius:8px; font-size:.85rem; background:#fff; color:var(--text); }
+input:focus { outline:none; border-color:var(--brand); }
+.out { margin-top:10px; padding:10px 12px; background:#f5f5f5; border-radius:8px; font-size:.78rem; max-height:150px; overflow-y:auto; word-break:break-word; }
+.sbar { height:8px; border-radius:4px; background:#e0e0e0; margin:5px 0; }
+.sfill { height:100%; border-radius:4px; transition:width .4s; }
+.tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.72rem; font-weight:600; margin:2px; }
+.tok { background:#c8e6c9; color:var(--ok); }
+.twn { background:#ffe0b2; color:var(--warn); }
+.terr { background:#ffcdd2; color:var(--danger); }
+.irow2 { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:.82rem; }
+.crisis-active { background:#fff3e0; border:2px solid var(--warn); border-radius:10px; padding:12px; margin-bottom:10px; font-size:.82rem; }
+#panel.col #panel-body, #panel.col #panel-tabs { display:none; }
+
+/* TOAST */
+#toast { position:fixed; bottom:72px; left:50%; transform:translateX(-50%); background:#323232; color:#fff; padding:9px 16px; border-radius:8px; font-size:.83rem; opacity:0; transition:opacity .2s; z-index:999; pointer-events:none; white-space:nowrap; }
+#toast.show { opacity:1; }
+</style>
 </head>
 <body>
-  <header>
-    <h1>Paso — Test Console</h1>
-    <span class="badge">supabase</span>
-    <span class="uid" id="uid">conectando…</span>
-  </header>
 
-  <nav>
-    <button data-tab="routing" class="active">Routing</button>
-    <button data-tab="report">Reporte</button>
-    <button data-tab="rutaviva">Ruta Viva</button>
-    <button data-tab="voice">Voz</button>
-    <button data-tab="crisis">Crisis</button>
-  </nav>
+<!-- ── SCREEN 1: LOGIN ────────────────────────────────────────────────────── -->
+<div id="s-login" class="screen active">
+  <div id="js-error" style="display:none;background:#ffcdd2;color:#b71c1c;padding:10px 16px;font-size:.82rem;text-align:center;position:fixed;top:0;left:0;right:0;z-index:9999"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>Paso ♿</h1>
+      <p>Ruteo accesible para Tijuana</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Iniciar sesión</button>
+      <button class="auth-tab"        onclick="switchAuthTab('register')">Registrarse</button>
+    </div>
+    <div id="ap-login" class="auth-pane active">
+      <div class="field"><label>Correo</label><input id="l-email" type="email" placeholder="correo@ejemplo.com"></div>
+      <div class="field"><label>Contraseña</label><input id="l-pass" type="password" placeholder="••••••••"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
+    </div>
+    <div id="ap-register" class="auth-pane">
+      <div class="field"><label>Correo</label><input id="r-email" type="email" placeholder="correo@ejemplo.com"></div>
+      <div class="field"><label>Contraseña</label><input id="r-pass" type="password" placeholder="Mínimo 6 caracteres"></div>
+      <button class="btn btn-primary" onclick="doRegister()">Crear cuenta</button>
+    </div>
+    <div id="auth-error"></div>
+    <button class="btn btn-anon" onclick="doAnon()">Continuar como invitado</button>
+  </div>
+</div>
 
-  <main>
-    <!-- Routing -->
-    <section id="routing" class="active">
-      <h2>POST /routingAccessible</h2>
-      <div class="row">
-        <div><label>Origen lat</label><input id="r-olat" value="32.5266" /></div>
-        <div><label>Origen lng</label><input id="r-olng" value="-117.0382" /></div>
-      </div>
-      <div class="row">
-        <div><label>Destino lat</label><input id="r-dlat" value="32.5248" /></div>
-        <div><label>Destino lng</label><input id="r-dlng" value="-117.0284" /></div>
-      </div>
-      <div class="row">
-        <div>
-          <label>Perfil</label>
-          <select id="r-profile">
-            <option value="wheelchair">wheelchair</option>
-            <option value="elderly">elderly</option>
-            <option value="cane">cane</option>
-            <option value="stroller">stroller</option>
-            <option value="none">none</option>
-          </select>
+<!-- ── SCREEN 2: PROFILE ──────────────────────────────────────────────────── -->
+<div id="s-profile" class="screen">
+  <div class="profile-card">
+    <h2>¿Cómo te desplazas?</h2>
+    <p>Usaremos esto para calcular rutas adaptadas a tus necesidades.</p>
+    <div class="mob-grid">
+      <button class="mob-btn" data-mob="wheelchair" onclick="selMob(this)"><span class="ic">♿</span>Silla de ruedas</button>
+      <button class="mob-btn" data-mob="elderly"    onclick="selMob(this)"><span class="ic">🧓</span>Adulto mayor</button>
+      <button class="mob-btn" data-mob="cane"       onclick="selMob(this)"><span class="ic">🦯</span>Bastón / andadera</button>
+      <button class="mob-btn" data-mob="stroller"   onclick="selMob(this)"><span class="ic">🍼</span>Carriola</button>
+      <button class="mob-btn mob-full" data-mob="none" onclick="selMob(this)"><span class="ic">🚶</span>Sin restricciones</button>
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()">Guardar y continuar</button>
+  </div>
+</div>
+
+<!-- ── SCREEN 3: APP ───────────────────────────────────────────────────────── -->
+<div id="s-app" class="screen">
+  <div id="topbar">
+    <span class="logo">Paso ♿</span>
+    <span id="user-label"></span>
+    <button id="btn-logout" onclick="doLogout()">Salir</button>
+  </div>
+  <div id="map-wrap">
+    <div id="map"><div id="map-ph">🗺 Cargando mapa…</div></div>
+  </div>
+  <div id="panel">
+    <div id="ph-row" onclick="togglePanel()"><span id="ph"></span></div>
+    <div id="panel-tabs">
+      <button class="ptab active" onclick="showPane('ruta')"><span class="ti">🗺️</span>Ruta</button>
+      <button class="ptab"        onclick="showPane('report')"><span class="ti">📷</span>Reportar</button>
+      <button class="ptab"        onclick="showPane('viva')"><span class="ti">🔮</span>Ruta Viva</button>
+      <button class="ptab"        onclick="showPane('crisis')"><span class="ti">🆘</span>Crisis</button>
+    </div>
+    <div id="panel-body">
+
+      <!-- RUTA -->
+      <div id="pane-ruta" class="pane active">
+        <div class="irow">
+          <div class="field"><label>Origen lat</label><input id="o-lat" type="number" step="any" placeholder="32.5266"></div>
+          <div class="field"><label>Origen lng</label><input id="o-lng" type="number" step="any" placeholder="-117.0382"></div>
+          <button class="loc-btn" title="Mi ubicación" onclick="fillLoc('o-lat','o-lng')">📍</button>
         </div>
-        <div>
-          <label>arrivalTime (opcional)</label>
-          <input id="r-arrival" placeholder="2026-05-28T10:00:00-07:00" />
+        <div class="irow">
+          <div class="field"><label>Destino lat</label><input id="d-lat" type="number" step="any" placeholder="32.5305"></div>
+          <div class="field"><label>Destino lng</label><input id="d-lng" type="number" step="any" placeholder="-117.0349"></div>
+          <button class="loc-btn" title="Tocar mapa" onclick="pickDest()">🎯</button>
         </div>
+        <div class="row2" style="margin-bottom:8px">
+          <div class="field"><label>Perfil</label>
+            <select id="r-profile">
+              <option value="wheelchair">Silla de ruedas</option>
+              <option value="elderly">Adulto mayor</option>
+              <option value="cane">Bastón</option>
+              <option value="stroller">Carriola</option>
+              <option value="none" selected>Estándar</option>
+            </select>
+          </div>
+          <div class="field"><label>Llegada (opcional)</label><input id="r-arrival" type="datetime-local"></div>
+        </div>
+        <button class="btn btn-primary" onclick="calcRoute()">Calcular ruta accesible</button>
+        <div id="ruta-out" class="out" style="display:none"></div>
       </div>
-      <button class="primary" onclick="callRouting()">Calcular ruta</button>
-      <pre id="r-out">—</pre>
-    </section>
 
-    <!-- Report -->
-    <section id="report">
-      <h2>POST /reportSubmit</h2>
-      <p class="hint">Sube una imagen al bucket <code>reports/{uid}/...</code> y envía la URL al endpoint.</p>
-      <div class="row">
-        <div><label>Lat</label><input id="rep-lat" value="32.5305" /></div>
-        <div><label>Lng</label><input id="rep-lng" value="-117.0349" /></div>
+      <!-- REPORTAR -->
+      <div id="pane-report" class="pane">
+        <div class="irow">
+          <div class="field"><label>Latitud</label><input id="rep-lat" type="number" step="any"></div>
+          <div class="field"><label>Longitud</label><input id="rep-lng" type="number" step="any"></div>
+          <button class="loc-btn" onclick="fillLoc('rep-lat','rep-lng')">📍</button>
+        </div>
+        <div class="field"><label>Foto de la barrera</label><input id="rep-file" type="file" accept="image/*" capture="environment"></div>
+        <button class="btn btn-primary" style="margin-top:8px" onclick="submitReport()">Enviar reporte</button>
+        <div id="rep-out" class="out" style="display:none"></div>
       </div>
-      <label>Foto (jpg/png, max 10 MB)</label>
-      <input type="file" id="rep-file" accept="image/*" />
-      <button class="primary" onclick="callReport()">Subir y reportar</button>
-      <pre id="rep-out">—</pre>
-    </section>
 
-    <!-- Ruta Viva -->
-    <section id="rutaviva">
-      <h2>GET /rutaVivaScore</h2>
-      <div class="row">
-        <div><label>Lat</label><input id="rv-lat" value="32.5266" /></div>
-        <div><label>Lng</label><input id="rv-lng" value="-117.0382" /></div>
+      <!-- RUTA VIVA -->
+      <div id="pane-viva" class="pane">
+        <div class="irow">
+          <div class="field"><label>Latitud</label><input id="v-lat" type="number" step="any" placeholder="32.5305"></div>
+          <div class="field"><label>Longitud</label><input id="v-lng" type="number" step="any" placeholder="-117.0349"></div>
+          <button class="loc-btn" onclick="fillLoc('v-lat','v-lng')">📍</button>
+        </div>
+        <div class="field"><label>Fecha y hora de llegada</label><input id="v-arrival" type="datetime-local"></div>
+        <button class="btn btn-primary" style="margin-top:8px" onclick="getRutaViva()">Predecir accesibilidad</button>
+        <div id="viva-out" class="out" style="display:none"></div>
       </div>
-      <label>arrivalTime (ISO con offset)</label>
-      <input id="rv-arrival" value="2026-05-28T10:00:00-07:00" />
-      <p class="hint">Tip: miércoles 10am en Mercado Hidalgo (32.5266, -117.0382) — debe bajar.</p>
-      <button class="primary" onclick="callRutaViva()">Consultar score</button>
-      <pre id="rv-out">—</pre>
-    </section>
 
-    <!-- Voice -->
-    <section id="voice">
-      <h2>POST /voiceQuery</h2>
-      <label>Texto del usuario (simulando voz)</label>
-      <textarea id="v-text">llévame al imss de aquí cerca</textarea>
-      <div class="row">
-        <div><label>Origen lat</label><input id="v-olat" value="32.5305" /></div>
-        <div><label>Origen lng</label><input id="v-olng" value="-117.0349" /></div>
+      <!-- CRISIS -->
+      <div id="pane-crisis" class="pane">
+        <div id="crisis-banner"></div>
+        <div class="irow">
+          <div class="field"><label>Latitud</label><input id="c-lat" type="number" step="any"></div>
+          <div class="field"><label>Longitud</label><input id="c-lng" type="number" step="any"></div>
+          <button class="loc-btn" onclick="fillLoc('c-lat','c-lng')">📍</button>
+        </div>
+        <button id="btn-cs"  class="btn btn-primary" onclick="startCrisis()" style="margin-bottom:6px">🆘 Iniciar modo crisis</button>
+        <button id="btn-cu"  class="btn btn-ghost"   onclick="updateCrisis()" style="display:none;margin-bottom:6px">📍 Actualizar ubicación</button>
+        <button id="btn-cr"  class="btn btn-anon"    onclick="resolveCrisis()" style="display:none">✅ Resolver emergencia</button>
+        <div id="crisis-out" class="out" style="display:none"></div>
       </div>
-      <label>Perfil</label>
-      <select id="v-profile">
-        <option value="wheelchair">wheelchair</option>
-        <option value="elderly">elderly</option>
-        <option value="cane">cane</option>
-      </select>
-      <button class="primary" onclick="callVoice()">Enviar</button>
-      <pre id="v-out">—</pre>
-    </section>
 
-    <!-- Crisis -->
-    <section id="crisis">
-      <h2>Modo Crisis</h2>
-      <div class="row">
-        <div><label>Lat</label><input id="c-lat" value="32.5266" /></div>
-        <div><label>Lng</label><input id="c-lng" value="-117.0382" /></div>
-      </div>
-      <div class="row">
-        <button class="primary" onclick="crisisStart()">Estoy varado</button>
-        <button class="primary" onclick="crisisUpdate()" style="background:#555">Update posición</button>
-        <button class="primary" onclick="crisisResolve()" style="background:#8a3030">Resolver</button>
-      </div>
-      <label>sessionId activo</label>
-      <input id="c-sid" placeholder="se llena después de Start" />
-      <p class="hint">Una vez creada la sesión, los cambios se emiten vía Supabase Realtime a cualquier suscriptor del canal <code>crisis_sessions:id=eq.&lt;sessionId&gt;</code>.</p>
-      <pre id="c-out">—</pre>
-    </section>
-  </main>
+    </div>
+  </div>
+</div>
 
-  <script type="module">
-    import { supabase, FUNCTIONS_BASE, ensureAnonSession } from './supabase-config.js';
+<div id="toast"></div>
 
-    let session = null;
+<!-- Supabase UMD: carga síncrona, expone window.supabase antes del siguiente script -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+window.onerror = function(msg, src, line) {
+  const d = document.getElementById('js-error');
+  if (d) { d.style.display='block'; d.textContent = '⚠ Error JS (línea '+line+'): '+msg; }
+};
 
-    (async () => {
-      session = await ensureAnonSession();
-      const uidEl = document.getElementById('uid');
-      uidEl.textContent = session ? `uid: ${session.user.id}` : 'sin sesión (¿anon disabled?)';
-    })();
+const { createClient } = supabase;
 
-    async function call(path, opts = {}) {
-      const token = session && session.access_token;
-      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${FUNCTIONS_BASE}/${path}`, { ...opts, headers });
-      const text = await res.text();
-      try { return { status: res.status, body: JSON.parse(text) }; }
-      catch { return { status: res.status, body: text }; }
-    }
+// ── Config inline — claves públicas solamente ────────────────────────────────
+const SUPABASE_URL        = 'https://xagroifcepcxhzeserda.supabase.co';
+const SUPABASE_ANON_KEY   = 'sb_publishable_gCb6wyXQ8Dcn7_J-CuAPiQ_M4y6RDkR';
+const GOOGLE_MAPS_API_KEY = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
+const GEMINI_API_KEY      = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
 
-    function show(id, data) {
-      document.getElementById(id).textContent = JSON.stringify(data, null, 2);
-    }
+// ── Constants ────────────────────────────────────────────────────────────────
+const TJ = { latMin:32.4, latMax:32.7, lngMin:-117.2, lngMax:-116.8 };
+const REPORT_R = 30, TICKET_SEV = 7, MIN_CONF = 0.6;
+const RV_MIN = 3, RV_R = 200, RV_HW = 0.7, RV_RW = 0.3;
+const THOLD = { wheelchair:6, elderly:4, cane:3, stroller:3, none:2 };
+const AVOID = { wheelchair:['broken_ramp','missing_ramp','no_curb_cut'], elderly:['missing_ramp'], cane:[], stroller:[], none:[] };
+const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-    document.querySelectorAll('nav button').forEach((b) => {
-      b.addEventListener('click', () => {
-        document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
-        document.querySelectorAll('section').forEach((x) => x.classList.remove('active'));
-        b.classList.add('active');
-        document.getElementById(b.dataset.tab).classList.add('active');
-      });
-    });
+// ── State ────────────────────────────────────────────────────────────────────
+let sb, session, gmap, mapReady=false, selMobility='none';
+let crisisId=null, crisisCh=null, pickingDest=false;
+const rvCache = new Map();
 
-    window.callRouting = async () => {
-      const body = {
-        origin: { lat: parseFloat(r_olat.value), lng: parseFloat(r_olng.value) },
-        destination: { lat: parseFloat(r_dlat.value), lng: parseFloat(r_dlng.value) },
-        userProfile: r_profile.value,
-      };
-      if (r_arrival.value) body.arrivalTime = r_arrival.value;
-      show('r-out', await call('routingAccessible', { method: 'POST', body: JSON.stringify(body) }));
-    };
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+function showJsError(msg) {
+  const d = document.getElementById('js-error');
+  if (d) { d.style.display = 'block'; d.textContent = '⚠ ' + msg; }
+  console.error(msg);
+}
 
-    window.callReport = async () => {
-      const file = rep_file.files[0];
-      if (!file) { show('rep-out', { error: 'Selecciona una foto' }); return; }
-      if (!session) { show('rep-out', { error: 'Esperando auth…' }); return; }
-      const objectPath = `${session.user.id}/${Date.now()}_${file.name}`;
-      const { error: upErr } = await supabase.storage.from('reports').upload(objectPath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type,
-      });
-      if (upErr) { show('rep-out', { error: upErr.message }); return; }
-      const { data: pub } = supabase.storage.from('reports').getPublicUrl(objectPath);
-      const photoUrl = pub.publicUrl;
-      show('rep-out', await call('reportSubmit', {
-        method: 'POST',
-        body: JSON.stringify({
-          lat: parseFloat(rep_lat.value),
-          lng: parseFloat(rep_lng.value),
-          photoUrl,
-        }),
-      }));
-    };
+try {
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true } });
+} catch(e) {
+  showJsError('No se pudo inicializar Supabase: ' + e.message + '. Verifica tu conexión a internet.');
+}
 
-    window.callRutaViva = async () => {
-      const url = `rutaVivaScore?lat=${rv_lat.value}&lng=${rv_lng.value}&arrivalTime=${encodeURIComponent(rv_arrival.value)}`;
-      show('rv-out', await call(url));
-    };
-
-    window.callVoice = async () => {
-      show('v-out', await call('voiceQuery', {
-        method: 'POST',
-        body: JSON.stringify({
-          userText: v_text.value,
-          origin: { lat: parseFloat(v_olat.value), lng: parseFloat(v_olng.value) },
-          userProfile: v_profile.value,
-        }),
-      }));
-    };
-
-    window.crisisStart = async () => {
-      const res = await call('crisisStart', {
-        method: 'POST',
-        body: JSON.stringify({ lat: parseFloat(c_lat.value), lng: parseFloat(c_lng.value) }),
-      });
-      if (res.body && res.body.sessionId) {
-        c_sid.value = res.body.sessionId;
-        // Suscribirse a Realtime para esta sesión.
-        supabase
-          .channel(`crisis-${res.body.sessionId}`)
-          .on('postgres_changes', {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'crisis_sessions',
-            filter: `id=eq.${res.body.sessionId}`,
-          }, (payload) => {
-            console.log('[realtime] crisis update', payload.new);
-            show('c-out', { status: 'realtime', payload: payload.new });
-          })
-          .subscribe();
+if (sb) {
+  sb.auth.onAuthStateChange(async (event, sess) => {
+    try {
+      session = sess;
+      if (sess) {
+        const has = await loadProfile(sess.user.id);
+        if (!has) { show('s-profile'); return; }
+        enterApp(sess);
+      } else {
+        show('s-login');
       }
-      show('c-out', res);
-    };
-    window.crisisUpdate = async () => {
-      if (!c_sid.value) { show('c-out', { error: 'No hay sessionId activo' }); return; }
-      show('c-out', await call('crisisUpdate', {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId: c_sid.value,
-          lat: parseFloat(c_lat.value),
-          lng: parseFloat(c_lng.value),
+    } catch(e) { showJsError('onAuthStateChange: ' + e.message); }
+  });
+
+  (async () => {
+    try {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) return;
+      session = data.session;
+      const has = await loadProfile(data.session.user.id);
+      if (!has) { show('s-profile'); return; }
+      enterApp(data.session);
+    } catch(e) { showJsError('getSession: ' + e.message); }
+  })();
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+window.switchAuthTab = (t) => {
+  document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',i===(t==='login'?0:1)));
+  document.querySelectorAll('.auth-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ap-'+t).classList.add('active');
+  document.getElementById('auth-error').textContent='';
+};
+window.doLogin = async () => {
+  const email=v('l-email'), pass=v('l-pass');
+  if(!email||!pass){authErr('Completa los campos');return;}
+  const{error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error) authErr(error.message);
+};
+window.doRegister = async () => {
+  const email=v('r-email'), pass=v('r-pass');
+  if(!email||!pass){authErr('Completa los campos');return;}
+  if(pass.length<6){authErr('Mínimo 6 caracteres');return;}
+  const{error}=await sb.auth.signUp({email,password:pass});
+  if(error) authErr(error.message); else toast('Cuenta creada — revisa tu correo');
+};
+window.doAnon = () => {
+  // Pase directo — sin auth, modo demo completo.
+  session = { user: { id: 'demo-guest', email: null, is_anonymous: true } };
+  selMobility = 'none';
+  show('s-app');
+  document.getElementById('user-label').textContent = 'Invitado (demo)';
+  document.getElementById('r-profile').value = 'none';
+  setTimeout(initMap, 150);
+};
+window.doLogout = async () => {
+  if(crisisCh){await sb.removeChannel(crisisCh);crisisCh=null;}
+  session = null;
+  if(sb) try { await sb.auth.signOut(); } catch(_){}
+  show('s-login');
+};
+function authErr(m){document.getElementById('auth-error').textContent=m;}
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+async function loadProfile(uid){
+  const{data}=await sb.from('user_profiles').select('mobility_type').eq('uid',uid).maybeSingle();
+  if(data){selMobility=data.mobility_type||'none'; const s=document.getElementById('r-profile'); if(s) s.value=selMobility;}
+  return !!data;
+}
+window.selMob = (btn) => {
+  document.querySelectorAll('.mob-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selMobility=btn.dataset.mob;
+};
+window.saveProfile = async () => {
+  if(!selMobility){toast('Selecciona una opción');return;}
+  const{error}=await sb.from('user_profiles').upsert({uid:session.user.id,mobility_type:selMobility},{onConflict:'uid'});
+  if(error){toast('Error: '+error.message);return;}
+  enterApp(session);
+};
+
+// ── App entry ────────────────────────────────────────────────────────────────
+function enterApp(sess){
+  const email=sess.user.email;
+  document.getElementById('user-label').textContent = email||'Invitado';
+  const s=document.getElementById('r-profile'); if(s) s.value=selMobility;
+  show('s-app');
+  setTimeout(initMap,150);
+}
+
+// ── Map ───────────────────────────────────────────────────────────────────────
+async function initMap(){
+  if(mapReady) return;
+  if(!GOOGLE_MAPS_API_KEY){document.getElementById('map-ph').textContent='Sin GOOGLE_MAPS_API_KEY en config.js';return;}
+  await new Promise((res,rej)=>{
+    window._gmCb=res;
+    const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=_gmCb&language=es&loading=async`;
+    s.async=true; s.onerror=rej; document.head.appendChild(s);
+  });
+  document.getElementById('map-ph').style.display='none';
+  gmap=new google.maps.Map(document.getElementById('map'),{
+    center:{lat:32.5266,lng:-117.0382},zoom:14,
+    mapTypeControl:false,streetViewControl:false,fullscreenControl:false,
+  });
+  gmap.addListener('click',(e)=>{
+    if(!pickingDest) return;
+    document.getElementById('d-lat').value=e.latLng.lat().toFixed(6);
+    document.getElementById('d-lng').value=e.latLng.lng().toFixed(6);
+    pickingDest=false; gmap.setOptions({draggableCursor:''});
+    toast('Destino marcado');
+  });
+  mapReady=true;
+}
+
+let poly=null, markers=[];
+function clearMap(){
+  if(poly){poly.setMap(null);poly=null;}
+  markers.forEach(m=>m.setMap(null)); markers=[];
+}
+function drawRoute(pts,oLL,dLL,warns){
+  if(!mapReady) return;
+  clearMap();
+  poly=new google.maps.Polyline({path:pts,geodesic:true,strokeColor:'#1565c0',strokeOpacity:.9,strokeWeight:5});
+  poly.setMap(gmap);
+  markers.push(new google.maps.Marker({position:oLL,map:gmap,
+    icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:'#2e7d32',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}}));
+  markers.push(new google.maps.Marker({position:dLL,map:gmap,
+    icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:'#c62828',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}}));
+  (warns||[]).forEach(w=>{
+    if(!w.lat) return;
+    markers.push(new google.maps.Circle({map:gmap,center:{lat:w.lat,lng:w.lng},radius:20,
+      fillColor:'#e65100',fillOpacity:.25,strokeColor:'#e65100',strokeWeight:1}));
+  });
+  const b=new google.maps.LatLngBounds();
+  pts.forEach(p=>b.extend(p)); gmap.fitBounds(b,40);
+}
+
+window.pickDest=()=>{
+  if(!mapReady){toast('El mapa aún no está listo');return;}
+  pickingDest=true; gmap.setOptions({draggableCursor:'crosshair'});
+  toast('Toca el mapa para marcar el destino');
+};
+
+// ── Geolocation ──────────────────────────────────────────────────────────────
+window.fillLoc=(aId,bId)=>{
+  if(!navigator.geolocation){toast('Geolocalización no disponible');return;}
+  toast('Obteniendo ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    (p)=>{set(aId,p.coords.latitude.toFixed(6));set(bId,p.coords.longitude.toFixed(6));toast('Listo');},
+    ()=>toast('No se pudo obtener la ubicación')
+  );
+};
+
+// ── Routing ───────────────────────────────────────────────────────────────────
+window.calcRoute = async () => {
+  const oLat=flt('o-lat'), oLng=flt('o-lng'), dLat=flt('d-lat'), dLng=flt('d-lng');
+  const profile=v('r-profile'), arrRaw=v('r-arrival');
+  const outEl=document.getElementById('ruta-out');
+  if(!fin(oLat)||!fin(dLat)){toast('Ingresa coordenadas');return;}
+  outEl.style.display='block'; outEl.textContent='⏳ Calculando ruta…';
+  try {
+    let base;
+    if(GOOGLE_MAPS_API_KEY){
+      const res=await fetch(ROUTES_URL,{
+        method:'POST',
+        headers:{'X-Goog-Api-Key':GOOGLE_MAPS_API_KEY,'X-Goog-FieldMask':'routes.encodedPolyline,routes.distanceMeters,routes.duration','Content-Type':'application/json'},
+        body:JSON.stringify({
+          origin:{location:{latLng:{latitude:oLat,longitude:oLng}}},
+          destination:{location:{latLng:{latitude:dLat,longitude:dLng}}},
+          travelMode:'WALK',computeAlternativeRoutes:false,
         }),
-      }));
-    };
-    window.crisisResolve = async () => {
-      if (!c_sid.value) { show('c-out', { error: 'No hay sessionId activo' }); return; }
-      show('c-out', await call('crisisResolve', {
-        method: 'POST',
-        body: JSON.stringify({ sessionId: c_sid.value }),
-      }));
-      c_sid.value = '';
-    };
-  </script>
+      });
+      if(!res.ok) throw new Error(`Routes API ${res.status}: ${await res.text()}`);
+      const d=await res.json(); const r=d.routes?.[0];
+      if(!r) throw new Error('Routes API no devolvió ruta');
+      base={enc:r.encodedPolyline.encodedPolyline, dist:r.distanceMeters, dur:parseInt(r.duration,10), mock:false};
+    } else {
+      base=mockRoute(oLat,oLng,dLat,dLng);
+    }
+
+    const pts=decodePoly(base.enc);
+    const bbox=bboxFromPts(pts);
+    const{data:nodes}=await sb.rpc('nodes_in_bbox',{p_lat_min:bbox.latMin,p_lat_max:bbox.latMax,p_lng_min:bbox.lngMin,p_lng_max:bbox.lngMax});
+    const{score,warnings}=scoreRoute(nodes||[],profile);
+
+    let rv=null;
+    if(arrRaw){
+      const mLat=(oLat+dLat)/2, mLng=(oLng+dLng)/2;
+      rv=await rvScore(mLat,mLng,arrRaw);
+    }
+    const fs=rv?.applied ? Math.round((score*.6+rv.score*10*.4)*10)/10 : score;
+    drawRoute(pts.map(p=>({lat:p.lat,lng:p.lng})),{lat:oLat,lng:oLng},{lat:dLat,lng:dLng},warnings);
+
+    const sc=fs>=7?'#2e7d32':fs>=4?'#e65100':'#c62828';
+    const dist=base.dist<1000?`${base.dist} m`:`${(base.dist/1000).toFixed(1)} km`;
+    let h=`<div class="irow2">📏 <b>${dist}</b> &nbsp; ⏱ <b>${Math.round(base.dur/60)} min</b>${base.mock?' <span class="tag twn">estimado</span>':''}</div>`;
+    h+=`<div class="irow2">♿ Score: <b style="color:${sc}">${fs}/10</b></div>`;
+    h+=`<div class="sbar"><div class="sfill" style="width:${fs*10}%;background:${sc}"></div></div>`;
+    if(rv?.applied) h+=`<div class="irow2">🔮 Ruta Viva: <span class="tag ${rv.score>=.6?'tok':rv.score>=.4?'twn':'terr'}">${(rv.score*100).toFixed(0)}%</span>${rv.hasEvent?'<span class="tag twn">⚠ evento</span>':''}</div>`;
+    if(warnings.length) h+=`<div style="margin-top:5px"><b style="color:var(--warn)">⚠ ${warnings.length} advertencia(s):</b><br>`+warnings.slice(0,3).map(w=>`<span class="tag twn">${w.message}</span>`).join('')+'</div>';
+    outEl.innerHTML=h;
+  } catch(e){ outEl.textContent='❌ '+e.message; }
+};
+
+function mockRoute(oLat,oLng,dLat,dLng){
+  const pts=[]; for(let i=0;i<=10;i++){const t=i/10;pts.push({lat:oLat+(dLat-oLat)*t,lng:oLng+(dLng-oLng)*t});}
+  const d=Math.round(haversine(oLat,oLng,dLat,dLng));
+  return{enc:encodePoly(pts),dist:d,dur:Math.round(d/1.4),mock:true};
+}
+function scoreRoute(nodes,profile){
+  if(!nodes.length) return{score:5.0,warnings:[{message:'Sin datos de accesibilidad en esta ruta'}]};
+  const mn=THOLD[profile]||2, av=AVOID[profile]||[];
+  let tot=0,wt=0; const warns=[];
+  for(const n of nodes){
+    const w=n.source==='field_verified'?1.5:1; tot+=n.score*w; wt+=w;
+    const bad=n.barrier_type&&av.includes(n.barrier_type);
+    if(n.score<mn||bad) warns.push({lat:n.lat,lng:n.lng,message:bad?`Barrera: ${n.barrier_type}`:`Score bajo (${n.score}/10)`});
+  }
+  return{score:Math.round(tot/wt*10)/10,warnings:warns};
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+window.submitReport = async () => {
+  if(!session){toast('Inicia sesión primero');return;}
+  const lat=flt('rep-lat'), lng=flt('rep-lng'), file=document.getElementById('rep-file').files[0];
+  const outEl=document.getElementById('rep-out');
+  if(!fin(lat)||!fin(lng)){toast('Ingresa coordenadas');return;}
+  if(!file){toast('Selecciona una foto');return;}
+  if(lat<TJ.latMin||lat>TJ.latMax||lng<TJ.lngMin||lng>TJ.lngMax){toast('Fuera de Tijuana');return;}
+  outEl.style.display='block'; outEl.textContent='⏳ Analizando con Gemini…';
+  try {
+    const uid=session.user.id;
+    const{base64,mime}=await toB64(file);
+    const a=await gemini(base64,mime);
+    const score=10-a.severity;
+    outEl.textContent=`⏳ Subiendo foto… (severidad ${a.severity}/10)`;
+    const ext=file.name.split('.').pop()||'jpg';
+    const path=`${uid}/${crypto.randomUUID()}.${ext}`;
+    const{error:upErr}=await sb.storage.from('reports').upload(path,file,{contentType:mime});
+    if(upErr) throw new Error('Storage: '+upErr.message);
+    const{data:sg,error:sgErr}=await sb.storage.from('reports').createSignedUrl(path,3600);
+    if(sgErr) throw new Error('SignedUrl: '+sgErr.message);
+    outEl.textContent='⏳ Guardando reporte…';
+    const{data:row,error:rErr}=await sb.from('reports').insert({
+      user_id:uid,lat,lng,photo_url:sg.signedUrl,
+      gemini_analysis:a,requires_human_review:a.confidence<MIN_CONF,status:'pending',
+    }).select().single();
+    if(rErr) throw new Error('reports: '+rErr.message);
+    const{error:nErr}=await sb.rpc('upsert_node_near',{
+      p_lat:lat,p_lng:lng,p_radius_m:REPORT_R,p_type:'sidewalk',
+      p_accessible:score>=5,p_score:score,
+      p_barrier_type:a.barrierType==='none'?null:a.barrierType,
+      p_photo_url:sg.signedUrl,p_gemini_analysis:a,p_source:'field_verified',
+    });
+    if(nErr) console.warn('upsert_node_near:',nErr.message);
+    let ticketId=null;
+    if(a.severity>=TICKET_SEV){
+      const{data:tid}=await sb.rpc('next_ticket_id');
+      ticketId=tid||null;
+    }
+    const now=new Date();
+    const{hour,dow}=tjHourDow(now);
+    sb.rpc('submit_report_background',{
+      p_report_id:row.id,p_uid:uid,p_lat:lat,p_lng:lng,
+      p_barrier_type:a.barrierType,p_severity:a.severity,
+      p_hour:hour,p_dow:dow,p_reported_at:row.created_at,
+      p_ticket_id:ticketId,p_photo_url:sg.signedUrl,
+      p_gemini_description:a.description,
+      p_affected_users:(a.affectedProfiles||[]).length*100,
+    });
+    const sc=score>=7?'#2e7d32':score>=4?'#e65100':'#c62828';
+    let h=`<div class="irow2">✅ Reporte <b>${row.id.slice(0,8)}</b></div>`;
+    h+=`<div class="irow2">🔍 <b>${a.barrierType||'ninguna'}</b> — sev <b style="color:${sc}">${a.severity}/10</b></div>`;
+    h+=`<div class="irow2">💬 ${a.description||''}</div>`;
+    if(ticketId) h+=`<div class="irow2">🎫 Ticket: <b>${ticketId}</b></div>`;
+    if(a.confidence<MIN_CONF) h+=`<span class="tag twn">⚠ Revisión humana requerida</span>`;
+    outEl.innerHTML=h;
+  } catch(e){ outEl.textContent='❌ '+e.message; }
+};
+
+async function gemini(b64,mime){
+  const prompt=`Analiza esta imagen de infraestructura peatonal en Tijuana, México.
+Devuelve SOLO JSON (sin markdown):
+{"barrierType":"none|broken_ramp|missing_ramp|no_curb_cut|broken_sidewalk|blocked_sidewalk|steep_slope|other",
+"severity":1,"passable":true,"confidence":0.9,"description":"breve en español","affectedProfiles":["wheelchair"]}
+severity: 1=sin problema, 10=completamente bloqueado.`;
+  const res=await fetch(GEMINI_URL,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],
+      generationConfig:{temperature:0.1}}),
+  });
+  if(!res.ok) throw new Error('Gemini '+res.status);
+  const d=await res.json();
+  let t=d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  t=t.replace(/```json\n?|\n?```/g,'').trim();
+  return JSON.parse(t);
+}
+function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{res({base64:r.result.split(',')[1],mime:file.type});};r.onerror=rej;r.readAsDataURL(file);});}
+
+// ── Ruta Viva ──────────────────────────────────────────────────────────────
+window.getRutaViva = async () => {
+  const lat=flt('v-lat'), lng=flt('v-lng'), arr=v('v-arrival');
+  const outEl=document.getElementById('viva-out');
+  if(!fin(lat)||!arr){toast('Ingresa ubicación y hora');return;}
+  outEl.style.display='block'; outEl.textContent='⏳ Consultando historial…';
+  const r=await rvScore(lat,lng,arr);
+  if(!r.applied){outEl.textContent=`⚠ Sin datos suficientes: ${r.reason||''}`;return;}
+  const pct=(r.score*100).toFixed(0);
+  const sc=r.score>=.7?'#2e7d32':r.score>=.4?'#e65100':'#c62828';
+  let h=`<div class="irow2">🔮 <b style="color:${sc}">${pct}% accesible</b></div>`;
+  h+=`<div class="sbar"><div class="sfill" style="width:${pct}%;background:${sc}"></div></div>`;
+  h+=`<div class="irow2">📊 ${r.dataPoints} registros históricos</div>`;
+  if(r.hasEvent) h+=`<span class="tag twn">⚠ Evento en ese horario</span>`;
+  if(r.recentReports>0) h+=`<div class="irow2">🔴 ${r.recentReports} reporte(s) reciente(s) en la zona</div>`;
+  outEl.innerHTML=h;
+};
+
+async function rvScore(lat,lng,arrISO){
+  const{hour,dow}=tjHourDow(new Date(arrISO));
+  const ck=`${lat.toFixed(3)}_${lng.toFixed(3)}_${hour}_${dow}`;
+  if(rvCache.has(ck)) return rvCache.get(ck);
+  const{data:hist}=await sb.rpc('ruta_viva_history',{p_lat:lat,p_lng:lng,p_hour:hour,p_dow:dow,p_radius_m:RV_R});
+  const row=hist?.[0];
+  if(!row||Number(row.data_points)<RV_MIN) return{applied:false,reason:`${row?.data_points||0} puntos`};
+  const{data:rec}=await sb.rpc('recent_reports_near',{p_lat:lat,p_lng:lng,p_radius_m:RV_R,p_window_seconds:7200});
+  let s=row.avg_score;
+  if(rec?.length){const avg=rec.reduce((a,r)=>{return a+(10-(r.gemini_analysis?.severity||5))/10;},0)/rec.length; s=s*RV_HW+avg*RV_RW;}
+  const result={applied:true,score:Math.min(.98,Math.max(.02,s)),dataPoints:Number(row.data_points),hasEvent:row.has_event,recentReports:rec?.length||0};
+  rvCache.set(ck,result); setTimeout(()=>rvCache.delete(ck),30*60*1000);
+  return result;
+}
+
+// ── Crisis ────────────────────────────────────────────────────────────────────
+window.startCrisis = async () => {
+  if(!session||session.user.is_anonymous){toast('Inicia sesión con correo para modo crisis');return;}
+  const lat=flt('c-lat'), lng=flt('c-lng'), outEl=document.getElementById('crisis-out');
+  if(!fin(lat)){toast('Ingresa tu ubicación');return;}
+  outEl.style.display='block'; outEl.textContent='⏳ Iniciando modo crisis…';
+  const{data:row,error}=await sb.from('crisis_sessions').insert({
+    user_id:session.user.id,current_lat:lat,current_lng:lng,
+    user_profile:{mobility_type:selMobility},status:'active',
+  }).select().single();
+  if(error){outEl.textContent='❌ '+error.message;return;}
+  crisisId=row.id;
+  document.getElementById('btn-cs').style.display='none';
+  document.getElementById('btn-cu').style.display='';
+  document.getElementById('btn-cr').style.display='';
+  document.getElementById('crisis-banner').innerHTML=`<div class="crisis-active">🆘 Crisis activa — ID: ${row.id.slice(0,8)}</div>`;
+  crisisCh=sb.channel('crisis-'+row.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'crisis_sessions',filter:`id=eq.${row.id}`},
+      (p)=>{const np=p.new.nearest_safe_point; if(np) outEl.textContent='✅ Punto seguro: '+JSON.stringify(np);})
+    .subscribe();
+  outEl.textContent='✅ Sesión iniciada. Contactos de emergencia notificados.';
+};
+window.updateCrisis = async () => {
+  if(!crisisId) return;
+  const lat=flt('c-lat'), lng=flt('c-lng');
+  if(!fin(lat)){fillLoc('c-lat','c-lng');return;}
+  const{error}=await sb.from('crisis_sessions').update({current_lat:lat,current_lng:lng,last_update:new Date().toISOString()}).eq('id',crisisId);
+  if(error) toast('Error: '+error.message); else toast('Ubicación actualizada');
+};
+window.resolveCrisis = async () => {
+  if(!crisisId) return;
+  await sb.from('crisis_sessions').update({status:'resolved',resolved_at:new Date().toISOString()}).eq('id',crisisId);
+  if(crisisCh){await sb.removeChannel(crisisCh);crisisCh=null;}
+  crisisId=null;
+  document.getElementById('btn-cs').style.display=''; document.getElementById('btn-cu').style.display='none'; document.getElementById('btn-cr').style.display='none';
+  document.getElementById('crisis-banner').innerHTML=''; document.getElementById('crisis-out').style.display='none';
+  toast('Emergencia resuelta ✅');
+};
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+window.showPane=(id)=>{
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  document.querySelectorAll('.ptab').forEach((b,i)=>b.classList.toggle('active',['ruta','report','viva','crisis'][i]===id));
+  if(id==='ruta'&&mapReady) google.maps.event.trigger(gmap,'resize');
+};
+window.togglePanel=()=>{
+  document.getElementById('panel').classList.toggle('col');
+  if(mapReady) setTimeout(()=>google.maps.event.trigger(gmap,'resize'),300);
+};
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+let tTimer;
+window.toast=function(msg){const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>e.classList.remove('show'),2500);};
+function toast(m){window.toast(m);}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function v(id){return document.getElementById(id)?.value||'';}
+function flt(id){return parseFloat(document.getElementById(id)?.value);}
+function set(id,val){const e=document.getElementById(id);if(e)e.value=val;}
+function fin(n){return Number.isFinite(n);}
+function tjHourDow(date){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Tijuana',hour:'numeric',weekday:'short',hour12:false}).formatToParts(date);
+  const hour=parseInt(parts.find(p=>p.type==='hour').value,10);
+  const dmap={Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
+  return{hour,dow:dmap[parts.find(p=>p.type==='weekday').value]};
+}
+function decodePoly(enc){
+  const pts=[];let i=0,la=0,ln=0;
+  while(i<enc.length){
+    let b,s=0,r=0; do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20); la+=(r&1)?~(r>>1):(r>>1);
+    s=0;r=0; do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20); ln+=(r&1)?~(r>>1):(r>>1);
+    pts.push({lat:la/1e5,lng:ln/1e5});
+  }
+  return pts;
+}
+function encodePoly(pts){
+  let out='',pl=0,pn=0;
+  const enc=v=>{v=v<0?~(v<<1):v<<1;let s='';while(v>=0x20){s+=String.fromCharCode((0x20|(v&0x1f))+63);v>>=5;}return s+String.fromCharCode(v+63);};
+  for(const p of pts){const il=Math.round(p.lat*1e5),in_=Math.round(p.lng*1e5);out+=enc(il-pl)+enc(in_-pn);pl=il;pn=in_;}
+  return out;
+}
+function bboxFromPts(pts,m=0.0008){
+  let a=Infinity,b=-Infinity,c=Infinity,d=-Infinity;
+  for(const p of pts){if(p.lat<a)a=p.lat;if(p.lat>b)b=p.lat;if(p.lng<c)c=p.lng;if(p.lng>d)d=p.lng;}
+  return{latMin:a-m,latMax:b+m,lngMin:c-m,lngMax:d+m};
+}
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000,r=Math.PI/180,dla=(la2-la1)*r,dlo=(lo2-lo1)*r;
+  return 2*R*Math.asin(Math.sqrt(Math.sin(dla/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dlo/2)**2));
+}
+</script>
 </body>
 </html>
