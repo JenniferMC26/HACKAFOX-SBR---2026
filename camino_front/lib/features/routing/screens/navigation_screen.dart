@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 import 'package:camino_front/features/emergency/screens/panic_screen.dart';
 
@@ -17,12 +18,41 @@ class NavigationScreen extends StatefulWidget {
 class _NavigationScreenState extends State<NavigationScreen> {
   final bool _hasAlert = true;
   late final String _destination;
+  GoogleMapController? _mapController;
+
+  static const _initialPosition = CameraPosition(
+    target: LatLng(32.5149, -117.0382),
+    zoom: 15.5,
+  );
+
+  final Set<Marker> _markers = {
+    const Marker(
+      markerId: MarkerId('destination'),
+      position: LatLng(32.5169, -117.0352),
+      infoWindow: InfoWindow(title: 'IMSS Clínica 1'),
+    ),
+  };
+
+  final Set<Polyline> _polylines = {
+    const Polyline(
+      polylineId: PolylineId('route'),
+      points: [
+        LatLng(32.5149, -117.0382),
+        LatLng(32.5155, -117.0370),
+        LatLng(32.5162, -117.0358),
+        LatLng(32.5169, -117.0352),
+      ],
+      color: Color(0xFF4285F4),
+      width: 5,
+    ),
+  };
 
   @override
   void initState() {
     super.initState();
     _destination = widget.destination;
   }
+
   final String _mobilityMode = "Silla de ruedas";
   final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
 
@@ -32,30 +62,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
       body: Stack(
         children: [
           // CAPA 1 — Fondo del mapa
-          Container(
-            color: const Color(0xFFF1F3F4),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.map_rounded,
-                    size: 80,
-                    color: const Color(0xFF9AA0A6).withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Ruta activa · IMSS Clínica 1, Centro TJ",
-                    style: TextStyle(
-                      color: Color(0xFF9AA0A6),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            onMapCreated: (controller) => _mapController = controller,
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
           ),
 
           // CAPA 2 — Banner superior flotante
@@ -201,7 +217,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
               button: true,
               label: "Centrar mapa en mi ubicación",
               child: GestureDetector(
-                onTap: () {},
+                onTap: () => _mapController?.animateCamera(
+                  CameraUpdate.newCameraPosition(_initialPosition),
+                ),
                 child: Container(
                   width: 52,
                   height: 52,
