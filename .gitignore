@@ -1,7 +1,13 @@
 # Credenciales — NUNCA commitear
 backend/serviceAccountKey.json
 backend/.env
+backend/functions/.env
+backend/public/config.js
+**/.env
 **/.env.local
+
+# PDFs sueltos
+*.pdf
 
 # Dependencias
 node_modules/
