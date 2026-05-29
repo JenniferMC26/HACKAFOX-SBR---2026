@@ -10,23 +10,21 @@
 # El emulador solo expone Functions (5001) y Hosting (5000) + Emulator UI (4000).
 # ─────────────────────────────────────────────────────────────────────────────
 
-FROM node:20-slim
+FROM node:22-slim
 
 # Python + Java (requerido por el Firebase Emulator Suite) + curl.
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    openjdk-17-jre-headless \
-    curl \
+    curl wget gnupg \
+    && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | apt-key add - \
+    && echo "deb https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" \
+       >> /etc/apt/sources.list.d/adoptium.list \
+    && apt-get update && apt-get install -y temurin-21-jre \
     && rm -rf /var/lib/apt/lists/*
 
 # Firebase CLI global.
 RUN npm install -g firebase-tools
 
 # Dependencias de Python para los scripts de seed.
-RUN pip3 install --break-system-packages google-cloud-bigquery
-
 WORKDIR /app
 
 # Instalar dependencias antes de copiar el resto — cachea bien.
