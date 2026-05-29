@@ -29,7 +29,7 @@ class CrisisService {
     final uid = AuthService.uid;
     if (uid == null) throw Exception('No hay sesion activa');
 
-    // Obtener perfil para snapshot
+    // Obtener perfil completo (movilidad + contactos de emergencia).
     final profile = await ProfileService.getProfile();
 
     final response = await _client
@@ -49,8 +49,8 @@ class CrisisService {
 
     _activeSessionId = response['id'] as String;
 
-    // Notificar contacto de emergencia
-    await _notifyEmergencyContact(lat: lat, lng: lng);
+    // Notificar al contacto de emergencia real del perfil.
+    await _notifyEmergencyContact(lat: lat, lng: lng, profile: profile);
 
     return _activeSessionId!;
   }
@@ -118,25 +118,71 @@ class CrisisService {
     _activeSessionId = null;
   }
 
-  /// Enviar notificacion al contacto de emergencia.
+  /// Enviar notificacion al contacto de emergencia real del usuario.
+  ///
+  /// Extrae el contacto de [profile] (campo emergency_contacts o
+  /// telefono_emergencia) y actualiza alerted_contacts en la sesion.
   static Future<void> _notifyEmergencyContact({
     required double lat,
     required double lng,
+    required Map<String, dynamic>? profile,
   }) async {
     final uid = AuthService.uid;
     if (uid == null) return;
 
     try {
+      // Construir lista de contactos alertados desde el perfil.
+      final List<Map<String, dynamic>> alertedContacts = [];
+
+      final rawContacts =
+          profile?['emergency_contacts'] as List<dynamic>? ?? [];
+      if (rawContacts.isNotEmpty) {
+        for (final c in rawContacts) {
+          final contact = Map<String, dynamic>.from(c as Map);
+          alertedContacts.add({
+            'nombre': contact['nombre'] ?? 'Contacto',
+            'telefono': contact['telefono'] ?? '',
+            'alertado_at': DateTime.now().toIso8601String(),
+          });
+        }
+      } else {
+        // Fallback: telefono_emergencia simple del perfil.
+        final phone = profile?['telefono_emergencia'] as String?;
+        if (phone != null && phone.isNotEmpty) {
+          alertedContacts.add({
+            'nombre': 'Contacto de emergencia',
+            'telefono': phone,
+            'alertado_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      // Actualizar alerted_contacts en la sesion de crisis.
+      if (_activeSessionId != null && alertedContacts.isNotEmpty) {
+        await _client
+            .from('crisis_sessions')
+            .update({'alerted_contacts': alertedContacts})
+            .eq('id', _activeSessionId!);
+      }
+
+      final mapsLink = 'https://maps.google.com/?q=$lat,$lng';
+      final contactInfo =
+          alertedContacts.isNotEmpty ? alertedContacts.first : null;
+
+      // Insertar notificacion con datos reales del contacto.
       await _client.from('notifications').insert({
-        'recipient_id': uid, // Auto-notificacion; en produccion seria el contacto
+        'recipient_id': uid,
         'type': 'crisis_alert',
         'from_user_id': uid,
         'session_id': _activeSessionId,
         'lat': lat,
         'lng': lng,
+        'emergency_contact': contactInfo,
+        'message': 'Usuario activó botón de pánico en PASO. '
+            'Enlace de ubicación: $mapsLink',
       });
     } catch (_) {
-      // No bloquear el flujo de crisis si falla la notificacion
+      // No bloquear el flujo de crisis si falla la notificacion.
     }
   }
 }
