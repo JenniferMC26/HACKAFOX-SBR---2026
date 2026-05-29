@@ -131,9 +131,53 @@ input:focus { outline:none; border-color:var(--brand); }
 
 <!-- ── SCREEN 2: PROFILE ──────────────────────────────────────────────────── -->
 <div id="s-profile" class="screen">
-  <div class="profile-card">
-    <h2>¿Cómo te desplazas?</h2>
-    <p>Usaremos esto para calcular rutas adaptadas a tus necesidades.</p>
+  <div class="profile-card" style="overflow-y:auto;max-height:100dvh;padding:24px 20px 32px;">
+    <h2 style="margin-bottom:4px">Tu perfil de accesibilidad</h2>
+    <p style="color:var(--muted);font-size:.83rem;margin-bottom:18px">Esta información personaliza tus rutas y tu seguridad.</p>
+
+    <div class="field"><label>Nombre completo</label>
+      <input id="p-nombre" type="text" placeholder="Ej. María González"></div>
+
+    <div class="field"><label>Teléfono</label>
+      <input id="p-tel" type="text" placeholder="664 123 4567"></div>
+
+    <div class="field"><label>Tipo de discapacidad</label>
+      <select id="p-discap" onchange="onDiscapChange()">
+        <option value="">— Selecciona —</option>
+        <option value="motriz_silla">Motriz — silla de ruedas</option>
+        <option value="motriz_baston">Motriz — bastón / andadera</option>
+        <option value="adulto_mayor">Adulto mayor</option>
+        <option value="visual">Visual</option>
+        <option value="auditiva">Auditiva</option>
+        <option value="cognitiva">Cognitiva / intelectual</option>
+        <option value="temporal">Lesión temporal</option>
+        <option value="ninguna">Sin discapacidad</option>
+        <option value="otra">Otra</option>
+      </select>
+    </div>
+
+    <!-- Campo secundario — solo visible cuando tipo = adulto_mayor -->
+    <div id="row-am" class="field" style="display:none">
+      <label>Condición principal (adulto mayor)</label>
+      <select id="p-cond-am">
+        <option value="">— Selecciona —</option>
+        <option value="artritis">Artritis / reumatismo</option>
+        <option value="osteoporosis">Osteoporosis</option>
+        <option value="vision_reducida">Visión reducida</option>
+        <option value="audicion_reducida">Audición reducida</option>
+        <option value="diabetes">Diabetes</option>
+        <option value="equilibrio">Problemas de equilibrio</option>
+        <option value="demencia_leve">Demencia leve</option>
+        <option value="otra">Otra</option>
+      </select>
+    </div>
+
+    <div class="field"><label>Teléfono de emergencia</label>
+      <input id="p-tel-em" type="text" placeholder="664 987 6543 (familiar o cuidador)"></div>
+
+    <div style="border-top:1px solid #f0f0f0;margin:14px 0 12px;font-size:.78rem;color:var(--muted)">
+      ¿Cómo te desplazas? (para el algoritmo de rutas)
+    </div>
     <div class="mob-grid">
       <button class="mob-btn" data-mob="wheelchair" onclick="selMob(this)"><span class="ic">♿</span>Silla de ruedas</button>
       <button class="mob-btn" data-mob="elderly"    onclick="selMob(this)"><span class="ic">🧓</span>Adulto mayor</button>
@@ -141,7 +185,8 @@ input:focus { outline:none; border-color:var(--brand); }
       <button class="mob-btn" data-mob="stroller"   onclick="selMob(this)"><span class="ic">🍼</span>Carriola</button>
       <button class="mob-btn mob-full" data-mob="none" onclick="selMob(this)"><span class="ic">🚶</span>Sin restricciones</button>
     </div>
-    <button class="btn btn-primary" onclick="saveProfile()">Guardar y continuar</button>
+
+    <button class="btn btn-primary" style="margin-top:16px" onclick="saveProfile()">Guardar y continuar</button>
   </div>
 </div>
 
@@ -247,10 +292,12 @@ window.onerror = function(msg, src, line) {
 
 const { createClient } = supabase;
 
-// ── Config inline — claves públicas solamente ────────────────────────────────
-const SUPABASE_URL        = 'https://xagroifcepcxhzeserda.supabase.co';
-const SUPABASE_ANON_KEY   = 'sb_publishable_gCb6wyXQ8Dcn7_J-CuAPiQ_M4y6RDkR';
-const GOOGLE_MAPS_API_KEY = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
+// ── Config — se hidrata desde /config (Cloud Function lee .env) ──────────────
+// XXX GEMINI_API_KEY sigue inline: el browser llama a Gemini directo en gemini().
+// Mover esa llamada a /reports/submit (Cloud Function) y quitar este const.
+let   SUPABASE_URL        = '';
+let   SUPABASE_ANON_KEY   = '';
+let   GOOGLE_MAPS_API_KEY = '';
 const GEMINI_API_KEY      = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -274,13 +321,36 @@ function showJsError(msg) {
   console.error(msg);
 }
 
-try {
-  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true } });
-} catch(e) {
-  showJsError('No se pudo inicializar Supabase: ' + e.message + '. Verifica tu conexión a internet.');
+const FUNCTIONS_BASE = location.hostname === 'localhost'
+  ? 'http://localhost:5001/paso/us-central1'
+  : '';   // mismo host en producción
+
+async function loadConfig() {
+  const res = await fetch(`${FUNCTIONS_BASE}/config`);
+  if (!res.ok) throw new Error('/config ' + res.status);
+  const c = await res.json();
+  SUPABASE_URL        = c.supabaseUrl        || '';
+  SUPABASE_ANON_KEY   = c.supabaseAnonKey    || '';
+  GOOGLE_MAPS_API_KEY = c.mapsApiKey         || '';
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !GOOGLE_MAPS_API_KEY) {
+    throw new Error('faltan keys en /config — revisa SUPABASE_URL, SUPABASE_ANON_KEY y GOOGLE_MAPS_API_KEY en backend/functions/.env');
+  }
 }
 
-if (sb) {
+(async () => {
+  try {
+    await loadConfig();
+  } catch(e) {
+    showJsError('No se pudo cargar /config: ' + e.message);
+    return;
+  }
+  try {
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true } });
+  } catch(e) {
+    showJsError('No se pudo inicializar Supabase: ' + e.message + '. Verifica tu conexión a internet.');
+    return;
+  }
+
   sb.auth.onAuthStateChange(async (event, sess) => {
     try {
       session = sess;
@@ -294,17 +364,15 @@ if (sb) {
     } catch(e) { showJsError('onAuthStateChange: ' + e.message); }
   });
 
-  (async () => {
-    try {
-      const { data } = await sb.auth.getSession();
-      if (!data.session) return;
-      session = data.session;
-      const has = await loadProfile(data.session.user.id);
-      if (!has) { show('s-profile'); return; }
-      enterApp(data.session);
-    } catch(e) { showJsError('getSession: ' + e.message); }
-  })();
-}
+  try {
+    const { data } = await sb.auth.getSession();
+    if (!data.session) return;
+    session = data.session;
+    const has = await loadProfile(data.session.user.id);
+    if (!has) { show('s-profile'); return; }
+    enterApp(data.session);
+  } catch(e) { showJsError('getSession: ' + e.message); }
+})();
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 window.switchAuthTab = (t) => {
@@ -345,19 +413,66 @@ function authErr(m){document.getElementById('auth-error').textContent=m;}
 
 // ── Profile ──────────────────────────────────────────────────────────────────
 async function loadProfile(uid){
-  const{data}=await sb.from('user_profiles').select('mobility_type').eq('uid',uid).maybeSingle();
-  if(data){selMobility=data.mobility_type||'none'; const s=document.getElementById('r-profile'); if(s) s.value=selMobility;}
+  const{data}=await sb.from('user_profiles')
+    .select('mobility_type,nombre,telefono,tipo_discapacidad,condicion_adulto_mayor,telefono_emergencia')
+    .eq('uid',uid).maybeSingle();
+  if(data){
+    selMobility=data.mobility_type||'none';
+    const s=document.getElementById('r-profile'); if(s) s.value=selMobility;
+    // Rellenar campos del formulario de perfil si existen
+    const fill=(id,val)=>{const e=document.getElementById(id);if(e&&val)e.value=val;};
+    fill('p-nombre', data.nombre);
+    fill('p-tel',    data.telefono);
+    fill('p-discap', data.tipo_discapacidad);
+    fill('p-cond-am',data.condicion_adulto_mayor);
+    fill('p-tel-em', data.telefono_emergencia);
+    if(data.tipo_discapacidad==='adulto_mayor'){
+      const row=document.getElementById('row-am'); if(row) row.style.display='';
+    }
+  }
   return !!data;
 }
+
+// Mostrar/ocultar campo secundario de adulto mayor
+window.onDiscapChange = () => {
+  const val = document.getElementById('p-discap').value;
+  const row = document.getElementById('row-am');
+  row.style.display = val==='adulto_mayor' ? '' : 'none';
+  if(val!=='adulto_mayor') document.getElementById('p-cond-am').value='';
+};
+
 window.selMob = (btn) => {
   document.querySelectorAll('.mob-btn').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel');
   selMobility=btn.dataset.mob;
+  // Sincronizar automáticamente: si eligen adulto mayor en el grid, setear discapacidad
+  if(btn.dataset.mob==='elderly'){
+    const d=document.getElementById('p-discap');
+    if(d&&!d.value) d.value='adulto_mayor';
+    window.onDiscapChange();
+  }
 };
+
 window.saveProfile = async () => {
-  if(!selMobility){toast('Selecciona una opción');return;}
-  const{error}=await sb.from('user_profiles').upsert({uid:session.user.id,mobility_type:selMobility},{onConflict:'uid'});
-  if(error){toast('Error: '+error.message);return;}
+  if(!selMobility){toast('Selecciona cómo te desplazas');return;}
+  const nombre   = v('p-nombre').trim();
+  const tel      = v('p-tel').trim();
+  const discap   = v('p-discap');
+  const condAM   = v('p-cond-am') || null;
+  const telEm    = v('p-tel-em').trim();
+
+  const row = {
+    uid: session.user.id,
+    mobility_type: selMobility,
+    nombre:                nombre   || null,
+    telefono:              tel      || null,
+    tipo_discapacidad:     discap   || null,
+    condicion_adulto_mayor:discap==='adulto_mayor' ? condAM : null,
+    telefono_emergencia:   telEm    || null,
+  };
+
+  const{error}=await sb.from('user_profiles').upsert(row,{onConflict:'uid'});
+  if(error){toast('Error guardando: '+error.message);return;}
   enterApp(session);
 };
 
