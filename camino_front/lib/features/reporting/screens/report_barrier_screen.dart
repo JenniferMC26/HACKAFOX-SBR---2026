@@ -428,28 +428,33 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity,
-                height: 160,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F3F4),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image_rounded,
-                      size: 40,
-                      color: Color(0xFF9AA0A6),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      "Vista previa de la imagen",
-                      style: TextStyle(fontSize: 14, color: Color(0xFF9AA0A6)),
-                    ),
-                  ],
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _imageBytes != null
+                    ? Image.memory(
+                        _imageBytes!,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: const Color(0xFFF1F3F4),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.image_rounded,
+                                size: 40, color: Color(0xFF9AA0A6)),
+                            SizedBox(height: 6),
+                            Text(
+                              'Sin foto',
+                              style: TextStyle(
+                                  fontSize: 14, color: Color(0xFF9AA0A6)),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
               const SizedBox(height: 16),
               const Row(

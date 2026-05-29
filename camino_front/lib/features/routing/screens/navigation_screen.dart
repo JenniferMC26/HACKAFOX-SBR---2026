@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 import 'package:camino_front/features/emergency/screens/panic_screen.dart';
+import 'package:camino_front/core/services/location_service.dart';
 
 class NavigationScreen extends StatefulWidget {
   const NavigationScreen({
@@ -20,8 +21,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
   bool _isAlternativeRoute = false;
   late final String _destination;
   GoogleMapController? _mapController;
+  LatLng? _userPosition;
 
-  static const _initialPosition = CameraPosition(
+  static const _fallbackPosition = CameraPosition(
     target: LatLng(32.5149, -117.0382),
     zoom: 15.5,
   );
@@ -91,6 +93,19 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void initState() {
     super.initState();
     _destination = widget.destination;
+    _moveToUserLocation();
+  }
+
+  /// Obtiene la posición GPS real y centra el mapa en ella.
+  Future<void> _moveToUserLocation() async {
+    final position = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    setState(() => _userPosition = position);
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: position, zoom: 15.5),
+      ),
+    );
   }
 
   void _switchToAlternativeRoute() {
@@ -130,8 +145,18 @@ class _NavigationScreenState extends State<NavigationScreen> {
         children: [
           // CAPA 1 — Fondo del mapa
           GoogleMap(
-            initialCameraPosition: _initialPosition,
-            onMapCreated: (controller) => _mapController = controller,
+            initialCameraPosition: _fallbackPosition,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              // Si la posición ya llegó antes de que el mapa estuviera listo, centrar ahora.
+              if (_userPosition != null) {
+                controller.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(target: _userPosition!, zoom: 15.5),
+                  ),
+                );
+              }
+            },
             markers: {..._markers, ..._barrierMarkers},
             polylines: _polylines,
             myLocationEnabled: true,
@@ -313,9 +338,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               button: true,
               label: "Centrar mapa en mi ubicación",
               child: GestureDetector(
-                onTap: () => _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(_initialPosition),
-                ),
+                onTap: _moveToUserLocation,
                 child: Container(
                   width: 52,
                   height: 52,
