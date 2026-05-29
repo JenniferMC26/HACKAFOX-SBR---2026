@@ -70,21 +70,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // SECCIÓN: Header
                     Center(
                       child: Image.asset(
-                        'assets/images/logo_icon.png',
-                        height: 64,
+                        'assets/images/logo_full.png',
+                        height: 110,
                         fit: BoxFit.contain,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      '¡Bienvenido a PASO!',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     const Text(
                       'Crea tu cuenta para empezar a navegar de forma segura.',
                       style: TextStyle(
@@ -93,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
                     // SECCIÓN: Formulario
                     Form(

@@ -47,20 +47,14 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image.asset(
-                'assets/images/logo_full.png',
-                height: 120,
+                'assets/images/logo_icon.png',
+                height: 200,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Tu ciudad, accesible para todos',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
               const SizedBox(
-                width: 24,
-                height: 24,
+                width: 28,
+                height: 28,
                 child: CircularProgressIndicator(
                   color: Color(0xFF4285F4),
                   strokeWidth: 2.5,

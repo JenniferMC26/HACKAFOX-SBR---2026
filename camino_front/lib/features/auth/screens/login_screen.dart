@@ -60,28 +60,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: Image.asset(
                         'assets/images/logo_full.png',
-                        height: 80,
+                        height: 130,
                         fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Center(
-                      child: Text(
-                        'PASO',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Center(
-                      child: Text(
-                        'Tu ciudad, accesible para todos',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                     const SizedBox(height: 40),
