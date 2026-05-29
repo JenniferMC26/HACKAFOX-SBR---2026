@@ -37,7 +37,7 @@ Paso/                               # Raíz del proyecto (repo)
     ├── functions/
     │   ├── src/
     │   │   ├── shared/
-    │   │   │   ├── clients.js          # Supabase (admin) + BigQuery inicializados una sola vez
+    │   │   │   ├── clients.js          # Cliente Supabase (service role) inicializado una sola vez
     │   │   │   ├── nodeUtils.js        # Búsqueda y actualización de nodos con PostGIS
     │   │   │   └── constants.js        # score = 10 - severity, umbrales de perfil, TTL de cache, etc.
     │   │   ├── routes/
@@ -46,7 +46,7 @@ Paso/                               # Raíz del proyecto (repo)
     │   │   │   ├── report.js           # Puente Ciudadano — submit de reportes
     │   │   │   └── geminiVision.js     # Wrapper Gemini Vision API (sin cambios)
     │   │   ├── ruta-viva/
-    │   │   │   └── prediction.js       # Score predictivo temporal con BigQuery (sin cambios)
+    │   │   │   └── prediction.js       # Score predictivo temporal con Supabase RPC ruta_viva_history
     │   │   ├── voice/
     │   │   │   └── conversation.js     # Navegador Sin Pantalla — llama routing.js por import directo
     │   │   └── crisis/
@@ -56,14 +56,14 @@ Paso/                               # Raíz del proyecto (repo)
     ├── seed/
     │   ├── supabase-seed.js            # Inserta nodos estimados + patrones temporales en Supabase
     │   ├── users-seed.js               # Inserta usuarios de prueba en Supabase Auth
-    │   ├── upload-field-photos.js      # Sube fotos a Supabase Storage y verifica nodos
     │   ├── supabase-schema.sql         # DDL completo de tablas Supabase + RLS
     │   ├── estimated-nodes.json        # Data de los 14 nodos estimados
     │   └── field-captures.json         # Nodos a verificar en campo (6 prioritarios)
     ├── public/
     │   ├── index.html                  # HTML de prueba — pestañas por feature
-    │   └── supabase-config.js          # Config pública del SDK cliente Supabase
-    ├── Dockerfile                      # Imagen: Node 20 + Python + Java 21 + Firebase CLI
+    │   ├── supabase-config.js          # Cliente Supabase — importa de config.js
+    │   └── config.example.js           # Plantilla — copiar a config.js (gitignored)
+    ├── Dockerfile                      # Imagen: Node 22 + Temurin JRE 21
     ├── docker-compose.yml              # Servicios: emulator (Functions only) + seed runner
     ├── .dockerignore
     ├── firebase.json
@@ -248,12 +248,6 @@ docker compose run --rm seed node seed/supabase-seed.js
 
 # Insertar usuarios de prueba
 docker compose run --rm seed node seed/users-seed.js
-
-# Insertar patrones temporales en BigQuery
-docker compose run --rm seed python3 seed/bigquery_seed.py
-
-# Subir fotos de campo a Supabase Storage
-docker compose run --rm seed node seed/upload-field-photos.js
 ```
 
 ### URLs del emulador local

@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "seed:nodes": "node seed/supabase-seed.js",
-    "seed:users": "node seed/users-seed.js",
-    "seed:bq": "python3 seed/bigquery_seed.py"
+    "seed:users": "node seed/users-seed.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0"
