@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:camino_front/core/services/crisis_service.dart';
 import 'package:camino_front/features/routing/screens/starting_screen.dart';
 
 class PanicScreen extends StatefulWidget {
@@ -11,7 +13,9 @@ class PanicScreen extends StatefulWidget {
 class _PanicScreenState extends State<PanicScreen> {
   bool _isActivated = false;
   bool _isCounting = false;
+  bool _isSubmitting = false;
   int _countdown = 3;
+  String? _sessionId;
 
   void _startCountdown() {
     if (_isCounting) return;
@@ -30,9 +34,10 @@ class _PanicScreenState extends State<PanicScreen> {
     }
     if (!mounted || !_isCounting) return;
     setState(() {
-      _isActivated = true;
       _isCounting = false;
+      _isSubmitting = true;
     });
+    await _activateCrisis();
   }
 
   void _cancelCountdown() {
@@ -42,6 +47,57 @@ class _PanicScreenState extends State<PanicScreen> {
         _countdown = 3;
       });
     }
+  }
+
+  Future<void> _activateCrisis() async {
+    try {
+      Position? position;
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission != LocationPermission.denied &&
+              permission != LocationPermission.deniedForever) {
+            position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+              ),
+            );
+          }
+        }
+      } catch (_) {}
+
+      final lat = position?.latitude ?? 32.5266;
+      final lng = position?.longitude ?? -117.0382;
+      _sessionId = await CrisisService.startCrisis(lat: lat, lng: lng);
+
+      if (!mounted) return;
+      setState(() {
+        _isActivated = true;
+        _isSubmitting = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _isCounting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al activar emergencia: $e'),
+          backgroundColor: const Color(0xFFEA4335),
+        ),
+      );
+    }
+  }
+
+  Future<void> _resolveCrisis() async {
+    try {
+      await CrisisService.resolveCrisis();
+    } catch (_) {}
   }
 
   String _getCurrentTime() {
@@ -117,8 +173,26 @@ class _PanicScreenState extends State<PanicScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // SECCIÓN: Enviando...
+                      if (_isSubmitting) ...[
+                        const SizedBox(height: 80),
+                        const CircularProgressIndicator(
+                          color: Color(0xFFEA4335),
+                          strokeWidth: 4,
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Enviando alerta...',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFEA4335),
+                          ),
+                        ),
+                      ],
+
                       // SECCIÓN: Estado normal
-                      if (!_isActivated) ...[
+                      if (!_isActivated && !_isSubmitting) ...[
                         const Icon(
                           Icons.shield_rounded,
                           size: 72,
@@ -346,6 +420,17 @@ class _PanicScreenState extends State<PanicScreen> {
                                 'Contacto notificado',
                                 'Contacto de emergencia',
                               ),
+                              if (_sessionId != null) ...[
+                                const Divider(
+                                  color: Color(0xFFC8E6C9),
+                                  height: 24,
+                                ),
+                                _buildConfirmRow(
+                                  Icons.tag_rounded,
+                                  'Sesión',
+                                  _sessionId!.substring(0, 8),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -372,13 +457,17 @@ class _PanicScreenState extends State<PanicScreen> {
                                 borderRadius: BorderRadius.circular(32),
                               ),
                             ),
-                            onPressed: () => Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const MapScreen(),
-                              ),
-                              (route) => false,
-                            ),
+                            onPressed: () async {
+                              await _resolveCrisis();
+                              if (!mounted) return;
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const MapScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 12),

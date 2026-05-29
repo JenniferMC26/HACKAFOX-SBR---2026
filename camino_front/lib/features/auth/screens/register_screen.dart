@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:camino_front/core/services/auth_service.dart';
+import 'package:camino_front/core/services/profile_service.dart';
 import 'package:camino_front/features/auth/screens/onboarding_mobility_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -21,13 +23,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const OnboardingMobilityScreen()),
-    );
+
+    try {
+      final phone = _phoneController.text.trim();
+      final password = _passwordController.text.trim();
+      final name = _nameController.text.trim();
+
+      await AuthService.signUp(phone: phone, password: password);
+      await ProfileService.upsertProfile(nombre: name, telefono: phone);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingMobilityScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      String errorMessage = 'Error al crear la cuenta';
+      if (e.toString().contains('already registered') ||
+          e.toString().contains('already been registered')) {
+        errorMessage = 'Este teléfono ya tiene una cuenta';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: const Color(0xFFEA4335),
+        ),
+      );
+    }
   }
 
   @override

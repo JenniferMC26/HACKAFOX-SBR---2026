@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:camino_front/core/services/profile_service.dart';
 import 'package:camino_front/features/routing/screens/starting_screen.dart';
 
 class OnboardingEmergencyScreen extends StatefulWidget {
@@ -24,7 +25,16 @@ class _OnboardingEmergencyScreenState
 
   Future<void> _handleFinish() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      await ProfileService.upsertProfile(
+        mobility: widget.mobility,
+        additionalOptions: widget.additionalOptions,
+        emergencyContactName: _nameController.text.trim(),
+        emergencyContactPhone: _phoneController.text.trim(),
+      );
+    } catch (_) {
+      // No bloquear — el perfil se puede completar después
+    }
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,

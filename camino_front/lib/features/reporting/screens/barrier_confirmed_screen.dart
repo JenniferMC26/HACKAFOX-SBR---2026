@@ -6,11 +6,13 @@ class BarrierConfirmedScreen extends StatelessWidget {
     this.barrierType = "Rampa destruida",
     this.severityLevel = 7,
     this.location = "Calle 3ra, Centro Tijuana",
+    this.ticketId,
   });
 
   final String barrierType;
   final int severityLevel;
   final String location;
+  final String? ticketId;
 
   Widget _buildRow(IconData icon, String label, String value, Color iconColor) {
     return Padding(
@@ -165,6 +167,15 @@ class BarrierConfirmedScreen extends StatelessWidget {
                       "Activo en el mapa",
                       const Color(0xFF34A853),
                     ),
+                    if (ticketId != null) ...[
+                      _divider(),
+                      _buildRow(
+                        Icons.confirmation_number_rounded,
+                        "Ticket cívico",
+                        ticketId!,
+                        const Color(0xFF4285F4),
+                      ),
+                    ],
                   ],
                 ),
               ),
