@@ -5,7 +5,7 @@ class BarrierConfirmedScreen extends StatelessWidget {
     super.key,
     this.barrierType = "Rampa destruida",
     this.severityLevel = 7,
-    this.location = "Centro, Tijuana",
+    this.location = "Calle 3ra, Centro Tijuana",
   });
 
   final String barrierType;
