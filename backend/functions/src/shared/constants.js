@@ -26,21 +26,18 @@ const THRESHOLDS = {
   none: 0,
 };
 
-// Tiempo de vida del cache en memoria de Ruta Viva.
+// Cache en memoria de Ruta Viva.
 const RUTA_VIVA_CACHE_TTL_MS = 30 * 60 * 1000;
 
-// Pesos al combinar histórico (BigQuery) con tiempo real (Firebase).
+// Pesos al combinar histórico (BigQuery) con tiempo real (Supabase).
 const RUTA_VIVA_BQ_WEIGHT = 0.7;
-const RUTA_VIVA_FIREBASE_WEIGHT = 0.3;
-
-// Mínimo de filas de BigQuery para confiar en la predicción histórica.
+const RUTA_VIVA_SUPABASE_WEIGHT = 0.3;
 const RUTA_VIVA_MIN_DATA_POINTS = 3;
 
 // Radio para considerar que un reporte aplica a un nodo existente.
 const REPORT_NEARBY_RADIUS_METERS = 30;
 
-// Confianza mínima de Gemini para auto-aplicar el reporte. Bajo este umbral
-// queda con requiresHumanReview: true.
+// Confianza mínima de Gemini para auto-aplicar el reporte.
 const GEMINI_MIN_CONFIDENCE = 0.6;
 
 // Severity a partir del cual se genera ticket cívico formal.
@@ -49,20 +46,16 @@ const TICKET_SEVERITY_THRESHOLD = 7;
 // Rate limit de reportes ciudadanos.
 const MAX_REPORTS_PER_HOUR = 5;
 
-// Precision del geohash para queries de bounding box (~150m por celda).
-const GEOHASH_PRECISION = 7;
-
 module.exports = {
   TJ_BOUNDS,
   severityToScore,
   THRESHOLDS,
   RUTA_VIVA_CACHE_TTL_MS,
   RUTA_VIVA_BQ_WEIGHT,
-  RUTA_VIVA_FIREBASE_WEIGHT,
+  RUTA_VIVA_SUPABASE_WEIGHT,
   RUTA_VIVA_MIN_DATA_POINTS,
   REPORT_NEARBY_RADIUS_METERS,
   GEMINI_MIN_CONFIDENCE,
   TICKET_SEVERITY_THRESHOLD,
   MAX_REPORTS_PER_HOUR,
-  GEOHASH_PRECISION,
 };

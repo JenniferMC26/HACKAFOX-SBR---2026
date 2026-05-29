@@ -11,12 +11,13 @@ Frontend final: Flutter (fuera del alcance de este plan).
 | Capa | Tecnología |
 |------|-----------|
 | API | Firebase Cloud Functions (Node.js 20) |
-| Base de datos en tiempo real | Firebase Realtime Database |
-| Almacenamiento de fotos | Firebase Storage |
+| Base de datos principal | Supabase PostgreSQL + PostGIS |
+| Autenticación | Supabase Auth (proveedor anónimo) |
+| Almacenamiento de fotos | Supabase Storage |
 | Analítica e historial | Google BigQuery |
 | Análisis de imágenes | Gemini Vision API (`gemini-2.5-flash`) |
 | Ruteo y mapas | Google Maps Routes API + Places API |
-| Frontend de prueba | HTML plano + Firebase JS SDK v10 + Google Maps JS API |
+| Frontend de prueba | HTML plano + Supabase JS SDK v2 + Google Maps JS API |
 | Entorno de desarrollo | Docker + Docker Compose (3 Windows + 1 macOS) |
 
 ---
@@ -37,40 +38,38 @@ Paso/                               # Raíz del proyecto (repo)
     ├── functions/
     │   ├── src/
     │   │   ├── shared/
-    │   │   │   ├── clients.js          # Firebase Admin + BigQuery inicializados una sola vez
-    │   │   │   ├── nodeUtils.js        # Búsqueda y actualización de nodos en /accessibility_layer
+    │   │   │   ├── clients.js          # Supabase (admin) + BigQuery inicializados una sola vez
+    │   │   │   ├── nodeUtils.js        # Búsqueda y actualización de nodos con PostGIS
     │   │   │   └── constants.js        # score = 10 - severity, umbrales de perfil, TTL de cache, etc.
     │   │   ├── routes/
     │   │   │   └── routing.js          # Motor de ruteo accesible (core)
     │   │   ├── reports/
     │   │   │   ├── report.js           # Puente Ciudadano — submit de reportes
-    │   │   │   └── geminiVision.js     # Wrapper Gemini Vision API
+    │   │   │   └── geminiVision.js     # Wrapper Gemini Vision API (sin cambios)
     │   │   ├── ruta-viva/
-    │   │   │   └── prediction.js       # Score predictivo temporal con BigQuery
+    │   │   │   └── prediction.js       # Score predictivo temporal con BigQuery (sin cambios)
     │   │   ├── voice/
     │   │   │   └── conversation.js     # Navegador Sin Pantalla — llama routing.js por import directo
     │   │   └── crisis/
-    │   │       └── crisis.js           # Modo Crisis — protocolo de emergencia
+    │   │       └── crisis.js           # Modo Crisis — usa Supabase Realtime
     │   ├── index.js                    # Registro de Cloud Functions + CORS
     │   └── package.json
     ├── seed/
-    │   ├── firebase-seed.js            # Inserta nodos estimados en Firebase
-    │   ├── users-seed.js               # Inserta usuarios de prueba
-    │   ├── verify-node.js              # Verifica nodo con foto real (field_verified)
-    │   ├── upload-field-photos.js      # Sube fotos de campo y verifica nodos
-    │   ├── bigquery_seed.py            # Inserta temporal_patterns en BigQuery
+    │   ├── supabase-seed.js            # Inserta nodos estimados en Supabase
+    │   ├── users-seed.js               # Inserta usuarios de prueba en Supabase Auth
+    │   ├── upload-field-photos.js      # Sube fotos a Supabase Storage y verifica nodos
+    │   ├── bigquery_seed.py            # Inserta temporal_patterns en BigQuery (sin cambios)
+    │   ├── supabase-schema.sql         # DDL completo de tablas Supabase + RLS
     │   ├── estimated-nodes.json        # Data de los 14 nodos estimados
-    │   ├── field-captures.json         # Nodos a verificar en campo (6 prioritarios)
-    │   └── fotos/                      # Fotos tomadas en campo (gitignore)
+    │   └── field-captures.json         # Nodos a verificar en campo (6 prioritarios)
     ├── public/
     │   ├── index.html                  # HTML de prueba — pestañas por feature
-    │   └── firebase-config.js          # Config pública del SDK cliente
-    ├── Dockerfile                      # Imagen: Node 20 + Python + Java + Firebase CLI
-    ├── docker-compose.yml              # Servicios: emulator + seed runner
+    │   └── supabase-config.js          # Config pública del SDK cliente Supabase
+    ├── Dockerfile                      # Imagen: Node 20 + Python + Java 21 + Firebase CLI
+    ├── docker-compose.yml              # Servicios: emulator (Functions only) + seed runner
     ├── .dockerignore
     ├── firebase.json
-    ├── serviceAccountKey.json          # NO commitear — credenciales Firebase Admin
-    └── .env                            # NO commitear — API keys
+    └── .env                            # NO commitear — API keys y credenciales Supabase
 ```
 
 ---
@@ -78,50 +77,96 @@ Paso/                               # Raíz del proyecto (repo)
 ## Variables de entorno requeridas (`backend/.env`)
 
 ```bash
+# Google APIs
 GEMINI_API_KEY=...
-GOOGLE_MAPS_API_KEY=...           # Habilitar: Routes API, Places API, Maps JS API
-FIREBASE_DATABASE_URL=https://paso-default-rtdb.firebaseio.com
+GOOGLE_MAPS_API_KEY=...           # Habilitar: Routes API, Places API
 GOOGLE_CLOUD_PROJECT=paso
+
+# Supabase (obtener en supabase.com → proyecto → Settings → API)
+SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_KEY=...          # service_role key — solo en backend, nunca en cliente
+SUPABASE_ANON_KEY=...             # anon key — va en el frontend (supabase-config.js)
 ```
 
-El archivo `serviceAccountKey.json` va dentro de `backend/`.
-El `.env` también va dentro de `backend/`.
-Nunca commitear ninguno de los dos.
+El `.env` va dentro de `backend/`. Nunca commitear.
+`SUPABASE_SERVICE_KEY` tiene permisos de administrador — tratar como `serviceAccountKey.json`.
 
 ---
 
-## Estructura de Firebase Realtime Database
+## Esquema Supabase (PostgreSQL + PostGIS)
 
-```
-/accessibility_layer/{nodeId}
-  lat, lng, type, accessible, score (0-10)
-  geohash                             # precision 7 (~150m) — requerido para queries por rango
-  source: "field_verified" | "estimated"
-  barrierType, lastReported, reportCount
-  photoUrl, geminiAnalysis (solo en field_verified)
+Correr `backend/seed/supabase-schema.sql` desde el SQL Editor de Supabase (una sola vez).
 
-/reports/{reportId}
-  userId, lat, lng, photoUrl
-  geminiAnalysis: { barrierType, severity, passable, affectedProfiles, confidence }
-  status: "pending" | "reviewed" | "resolved"
-  createdAt, ticketId (si severity >= 7)
+```sql
+-- Habilitar extensión geoespacial
+CREATE EXTENSION IF NOT EXISTS postgis;
 
-/crisis_sessions/{sessionId}
-  userId, userProfile, startedAt
-  currentLat, currentLng, status: "active" | "resolved"
-  nearestSafePoint: { name, lat, lng, distanceMeters }
-  alternativeRoute, alertedContacts[]
+-- Tabla 1: nodos de accesibilidad urbana
+CREATE TABLE public.accessibility_nodes (
+  id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  lat             FLOAT8 NOT NULL,
+  lng             FLOAT8 NOT NULL,
+  location        GEOGRAPHY(POINT, 4326),   -- generado en insert/update
+  type            TEXT,
+  accessible      BOOLEAN,
+  score           INT CHECK (score BETWEEN 0 AND 10),
+  source          TEXT DEFAULT 'estimated' CHECK (source IN ('field_verified','estimated')),
+  barrier_type    TEXT,
+  last_reported   TIMESTAMPTZ,
+  report_count    INT DEFAULT 0,
+  photo_url       TEXT,
+  gemini_analysis JSONB,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
 
-/users/{uid}
-  profile: { mobilityType, avoidSteps, avoidSlopes, slopeMaxPercent, emergencyContacts[] }
-  notifications/{notifId}: { type, fromUserId, sessionId, lat, lng, read }
+-- Tabla 2: reportes ciudadanos
+CREATE TABLE public.reports (
+  id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id         TEXT NOT NULL,
+  lat             FLOAT8 NOT NULL,
+  lng             FLOAT8 NOT NULL,
+  location        GEOGRAPHY(POINT, 4326),
+  photo_url       TEXT,
+  gemini_analysis JSONB,
+  status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','reviewed','resolved')),
+  ticket_id       TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
 
-/counters/ticketSeq                   # INTEGER — incrementado con transaction() al crear cada ticket
+-- Tabla 3: sesiones de crisis
+CREATE TABLE public.crisis_sessions (
+  id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id             TEXT NOT NULL,
+  user_profile        JSONB,
+  started_at          TIMESTAMPTZ DEFAULT NOW(),
+  current_lat         FLOAT8,
+  current_lng         FLOAT8,
+  current_location    GEOGRAPHY(POINT, 4326),
+  status              TEXT DEFAULT 'active' CHECK (status IN ('active','resolved')),
+  nearest_safe_point  JSONB,
+  alternative_route   JSONB,
+  alerted_contacts    JSONB DEFAULT '[]'::jsonb
+);
+
+-- Tabla 4: perfiles de usuario
+CREATE TABLE public.user_profiles (
+  uid                  TEXT PRIMARY KEY,
+  mobility_type        TEXT,
+  avoid_steps          BOOLEAN DEFAULT FALSE,
+  avoid_slopes         BOOLEAN DEFAULT FALSE,
+  slope_max_percent    FLOAT8 DEFAULT 8.0,
+  emergency_contacts   JSONB DEFAULT '[]'::jsonb,
+  created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Secuencia atómica para ticket IDs (reemplaza /counters/ticketSeq de RTDB)
+CREATE SEQUENCE public.ticket_seq START 1;
 ```
 
 ---
 
-## Tablas BigQuery (`dataset: paso`)
+## Tablas BigQuery (`dataset: paso`) — sin cambios
 
 ```sql
 -- accessibility_reports: espejo histórico de reportes ciudadanos
@@ -142,119 +187,97 @@ affected_users_estimate, created_at, assigned_to, status
 
 ## Entorno Docker (desarrollo multi-máquina)
 
-El proyecto corre dentro de Docker para garantizar el mismo entorno en
-3 Windows y 1 macOS. Nunca se instala Firebase CLI ni Node directamente
-en la máquina host — todo va dentro del contenedor.
+El Docker ahora solo emula **Firebase Cloud Functions**. Supabase corre en la nube
+(free tier) — no hay emulador local de Supabase.
 
 ### Prerequisitos (una vez por máquina)
 
-1. Instalar **Docker Desktop**:
-   - Windows: https://www.docker.com/products/docker-desktop — activar WSL2 si lo pide
-   - macOS: misma página, versión Apple Silicon o Intel según el chip
-2. Clonar el repo, entrar a `backend/` y crear el `.env` (ver sección de variables de entorno)
-3. Colocar `serviceAccountKey.json` dentro de `backend/` (nunca commitear)
+1. Instalar **Docker Desktop** (activar WSL2 en Windows)
+2. Crear proyecto en **supabase.com** y copiar las 3 variables al `.env`
+3. Clonar el repo y correr `copy .env.example .env` desde `backend/`
 
 ### Comandos esenciales
 
-> **Todos los comandos Docker se corren desde la carpeta `backend/`**
-
 ```bash
-# Primero, moverse a la carpeta backend
 cd backend/
 
-# Primera vez — construir la imagen (también al cambiar Dockerfile o package.json)
+# Primera vez
 docker compose build
 
-# Levantar el emulador local de Firebase
-docker compose up
-
-# Levantar en background
+# Levantar el emulador de Functions
 docker compose up -d
 
-# Ver logs en tiempo real (si está en background)
+# Ver logs
 docker compose logs -f emulator
 
-# Apagar todo
+# Apagar
 docker compose down
 ```
 
 ### Correr scripts de seed
 
 ```bash
-# Desde backend/
 cd backend/
 
-# Insertar nodos estimados en Firebase Emulator
-docker compose run seed node seed/firebase-seed.js
+# Insertar nodos en Supabase (requiere SUPABASE_URL y SUPABASE_SERVICE_KEY en .env)
+docker compose run --rm seed node seed/supabase-seed.js
 
 # Insertar usuarios de prueba
-docker compose run seed node seed/users-seed.js
+docker compose run --rm seed node seed/users-seed.js
 
-# Insertar patrones temporales en BigQuery (prod — requiere credenciales reales)
-docker compose run seed python3 seed/bigquery_seed.py
+# Insertar patrones temporales en BigQuery
+docker compose run --rm seed python3 seed/bigquery_seed.py
 
-# Subir fotos de campo y verificar nodos (requiere fotos en seed/fotos/)
-docker compose run seed node seed/upload-field-photos.js
+# Subir fotos de campo a Supabase Storage
+docker compose run --rm seed node seed/upload-field-photos.js
 ```
 
 ### URLs del emulador local
 
 | Servicio | URL |
 |----------|-----|
-| Emulator UI (panel visual) | http://localhost:4000 |
+| Test console (5 pestañas) | http://localhost:5000 |
+| Emulator UI | http://localhost:4000 |
 | Cloud Functions | http://localhost:5001/paso/us-central1/<fn> |
-| Realtime Database | http://localhost:9000 |
-| Storage | http://localhost:9199 |
 
-### Apuntar el HTML de prueba al emulador
+### Apuntar el HTML de prueba al emulador de Functions
 
-En `backend/public/firebase-config.js`, cuando se trabaje localmente, agregar después
-de `initializeApp(firebaseConfig)`:
+En `backend/public/supabase-config.js`, el cliente Supabase siempre apunta a producción.
+Solo las Cloud Functions se redirigen al emulador local:
 
 ```javascript
 // Solo en desarrollo local — comentar para producción
 if (location.hostname === 'localhost') {
-  connectDatabaseEmulator(db, 'localhost', 9000);
-  connectStorageEmulator(storage, 'localhost', 9199);
-  connectFunctionsEmulator(functions, 'localhost', 5001);
+  // Supabase apunta a prod siempre (no tiene emulador local)
+  // Solo redirigir las Cloud Functions al emulador
+  const FUNCTIONS_BASE = 'http://localhost:5001/paso/us-central1';
 }
 ```
-
-### Notas de seguridad del contenedor
-
-- `serviceAccountKey.json` y `.env` están en `.dockerignore` — **nunca entran en la imagen**
-- Se montan como volumen en tiempo de ejecución, no se copian al hacer `build`
-- `seed/fotos/` también está excluido — las fotos pesadas no van en la imagen
 
 ---
 
 ## Orden de implementación
 
-Implementar en este orden exacto. Cada paso desbloquea el siguiente.
-
 ### Fase 0 — Setup (antes de escribir código)
 
 ```bash
-# 1. Crear proyecto en Firebase Console con nombre "paso"
-#    - Habilitar Realtime Database (modo test por ahora)
-#    - Habilitar Storage
-#    - Habilitar Authentication → activar proveedor "Anónimo"
-#    - Descargar serviceAccountKey.json → colocarlo en backend/
+# 1. Crear proyecto en supabase.com
+#    - Copiar SUPABASE_URL, SUPABASE_SERVICE_KEY y SUPABASE_ANON_KEY al .env
+#    - Ir al SQL Editor → pegar y correr backend/seed/supabase-schema.sql
+#    - En Authentication → Providers → activar "Anonymous sign-ins"
+#    - En Storage → crear bucket "reports" (público: false)
 
 # 2. Habilitar APIs en Google Cloud Console
-#    - Routes API
-#    - Places API (New)
-#    - Maps JavaScript API
-#    - Gemini API (via AI Studio o Google Cloud)
+#    - Routes API, Places API (New), Maps JavaScript API
+#    - Gemini API (via AI Studio)
 
 # 3. Crear dataset y tablas en BigQuery
-#    Correr backend/seed/queries.sql desde la consola de BQ o con bq CLI
-#    Incluye DDL de las 3 tablas: accessibility_reports, temporal_patterns, civic_tickets
+#    Correr backend/seed/queries.sql (Parte A) desde la consola de BQ
 
-# 4. Inicializar Firebase dentro de backend/
+# 4. Inicializar Firebase Cloud Functions dentro de backend/
 cd backend/
 firebase init functions   # Node.js 20, JavaScript
-npm install --save @google-cloud/bigquery @google/generative-ai cors firebase-admin ngeohash
+npm install --save @google-cloud/bigquery @google/generative-ai cors @supabase/supabase-js
 
 # 5. Construir el contenedor Docker
 docker compose build
@@ -267,18 +290,14 @@ docker compose build
 **Skill de referencia**: `skills/paso-seed-data/SKILL.md`
 
 ```bash
-# Desde backend/
 cd backend/
-docker compose run seed node seed/firebase-seed.js
-docker compose run seed node seed/users-seed.js
-docker compose run seed python3 seed/bigquery_seed.py
-
-# Para subir fotos tomadas en campo:
-docker compose run seed node seed/upload-field-photos.js
+docker compose run --rm seed node seed/supabase-seed.js
+docker compose run --rm seed node seed/users-seed.js
+docker compose run --rm seed python3 seed/bigquery_seed.py
 ```
 
-**Verificación**: abrir Firebase Console → Realtime Database → confirmar que
-`/accessibility_layer` tiene ~20 nodos y `/users` tiene los 3 usuarios de prueba.
+**Verificación**: Supabase Dashboard → Table Editor → `accessibility_nodes` debe tener
+~14 nodos y `user_profiles` los 3 usuarios de prueba.
 
 ---
 
@@ -291,13 +310,14 @@ Archivo: `backend/functions/src/routes/routing.js`
 Lógica:
 1. Llama Routes API con `travelMode: WALK`
 2. Decodifica el polyline resultante
-3. Consulta `/accessibility_layer` en Firebase buscando nodos en el bounding box de la ruta
+3. Consulta `accessibility_nodes` en Supabase con PostGIS bounding box:
+   ```sql
+   SELECT * FROM accessibility_nodes
+   WHERE ST_Within(location, ST_MakeEnvelope($lngMin,$latMin,$lngMax,$latMax,4326)::geography)
+   ```
 4. Calcula `accessibilityScore` promedio y genera `warnings[]`
-5. Aplica umbrales diferenciados por perfil (`wheelchair` más estricto que `elderly`)
-6. Si `arrivalTime` está presente, llama a `getRutaVivaScore()` e inyecta el ajuste
-
-**Test con HTML**: formulario con lat/lng origen, lat/lng destino y selector de perfil.
-La respuesta dibuja una polyline en el mapa y muestra markers rojos en los warnings.
+5. Aplica umbrales por perfil (`wheelchair` más estricto que `elderly`)
+6. Si `arrivalTime` presente → llama `getRutaVivaScore()` e inyecta el ajuste
 
 ```bash
 firebase deploy --only functions:routingAccessible
@@ -312,21 +332,20 @@ firebase deploy --only functions:routingAccessible
 Archivos: `backend/functions/src/reports/geminiVision.js` + `backend/functions/src/reports/report.js`
 
 Lógica:
-1. Verificar `idToken` del header `Authorization: Bearer <token>` con `admin.auth().verifyIdToken()`
-2. El cliente HTML sube la foto a Firebase Storage y envía la `photoUrl`
-3. Cloud Function descarga la foto y la envía a Gemini Vision con el prompt estructurado
-4. Gemini devuelve JSON: `barrierType`, `severity` (1-10), `passable`, `affectedProfiles`, `confidence`
-5. Si `confidence < 0.6` → marcar `requiresHumanReview: true`
-6. Actualizar `/accessibility_layer` — si hay nodo cercano (< 30m) actualizarlo, si no crear uno nuevo (incluir `geohash`)
-7. Escribir en BigQuery `accessibility_reports` (fire and forget — no bloquea la respuesta)
-8. Si `severity >= 7` → obtener ticket ID con `db.ref('/counters/ticketSeq').transaction(n => n + 1)`,
+1. Verificar JWT de Supabase del header `Authorization: Bearer <token>`
+2. El cliente HTML sube la foto a **Supabase Storage** bucket `reports/{uid}/` y envía la URL
+3. Cloud Function descarga la foto y la envía a Gemini Vision
+4. Gemini devuelve JSON: `barrierType`, `severity`, `passable`, `affectedProfiles`, `confidence`
+5. Si `confidence < 0.6` → `requiresHumanReview: true`
+6. Upsert en `accessibility_nodes` — si hay nodo a < 30m actualizarlo (PostGIS), si no crear uno:
+   ```sql
+   SELECT id FROM accessibility_nodes
+   WHERE ST_DWithin(location, ST_Point($lng,$lat)::geography, 30)
+   ORDER BY location <-> ST_Point($lng,$lat)::geography LIMIT 1
+   ```
+7. Escribir en BigQuery `accessibility_reports` (fire and forget)
+8. Si `severity >= 7` → obtener ticket ID atómico con `SELECT nextval('ticket_seq')`,
    formatear como `PASO-YYYY-NNNN`, insertar en BigQuery `civic_tickets`
-
-**Score derivado de Gemini**: `score = 10 - severity`
-(severity 2 → score 8 muy accesible; severity 8 → score 2 muy inaccesible)
-
-**Test con HTML**: input de archivo de imagen + botón → mostrar JSON de respuesta +
-ver el nuevo nodo aparecer en el mapa en tiempo real vía Firebase listener.
 
 ```bash
 firebase deploy --only functions:reportSubmit
@@ -340,17 +359,17 @@ firebase deploy --only functions:reportSubmit
 
 Archivo: `backend/functions/src/ruta-viva/prediction.js`
 
-Lógica:
-1. Extraer `hour_of_day` y `day_of_week` del `arrivalTime` ISO 8601
-2. Query BigQuery en `temporal_patterns` con radio ~200m alrededor del punto
-3. Si `dataPoints < 3` → fallback gracioso con `applied: false` (no inventar scores)
-4. Combinar 70% histórico BQ + 30% Firebase reciente (últimas 2h)
-5. Cache en memoria con TTL 30 min por `(lat_rounded, lng_rounded, hour, dow)`
+**Sin cambios respecto al diseño original** — usa BigQuery exclusivamente.
+El 30% de datos recientes ahora se consulta desde Supabase `reports` en lugar de RTDB:
 
-Integración con Fase 2: el motor de ruteo llama `getRutaVivaScore()` si recibe `arrivalTime`.
-
-**Test con HTML**: selector `datetime-local` → mismo punto a distintas horas →
-score debe bajar los miércoles 10am en Mercado Hidalgo.
+```js
+// Reemplazar la consulta de Firebase reciente por:
+const { data } = await supabase
+  .from('reports')
+  .select('gemini_analysis')
+  .gte('created_at', new Date(Date.now() - 2*60*60*1000).toISOString())
+  .filter('location', 'st_dwithin', `POINT(${lng} ${lat}),200`);
+```
 
 ```bash
 firebase deploy --only functions:rutaVivaScore
@@ -364,15 +383,8 @@ firebase deploy --only functions:rutaVivaScore
 
 Archivo: `backend/functions/src/voice/conversation.js`
 
-Lógica:
-1. Gemini interpreta la intención del usuario (frases ambiguas como "el IMSS de aquí cerca")
-2. Si `intent = navigate` → Places API resuelve el destino a coordenadas
-3. Motor de ruteo (Fase 2) calcula la ruta
-4. Segundo llamado a Gemini convierte la ruta técnica a instrucciones de voz en español
-5. Mantener `conversationHistory[]` en el cliente entre llamadas
-
-**Test con HTML**: textarea que simula la voz (el usuario escribe como si hablara).
-`SpeechSynthesisUtterance` sintetiza la respuesta en audio.
+**Sin cambios significativos** — llama `routing.js` por import directo. La verificación
+de JWT cambia a Supabase igual que en Fase 3.
 
 ```bash
 firebase deploy --only functions:voiceQuery
@@ -387,13 +399,21 @@ firebase deploy --only functions:voiceQuery
 Archivo: `backend/functions/src/crisis/crisis.js`
 
 Endpoints:
-- `POST /crisis/start` — busca punto seguro, notifica contactos, crea sesión
-- `PUT /crisis/:id/update` — actualiza lat/lng cada 10s
-- `DELETE /crisis/:id/resolve` — cierra la sesión
+- `POST /crisis/start` — inserta sesión en `crisis_sessions`, busca punto seguro, notifica contactos
+- `PUT /crisis/:id/update` — actualiza `current_lat/lng/location` (Supabase Realtime emite el cambio)
+- `DELETE /crisis/:id/resolve` — actualiza `status = 'resolved'`
 
-**Test con HTML**: dos pestañas del navegador simultáneas.
-- Pestaña 1 (usuario varado): botón "Estoy varado" → ver punto seguro sugerido
-- Pestaña 2 (contacto): Firebase `onValue()` actualiza el marker en tiempo real
+**Real-time en el cliente** (reemplaza `onValue()` de Firebase):
+```javascript
+const channel = supabase.channel('crisis-' + sessionId)
+  .on('postgres_changes', {
+    event: 'UPDATE',
+    schema: 'public',
+    table: 'crisis_sessions',
+    filter: `id=eq.${sessionId}`
+  }, (payload) => updateMarkerOnMap(payload.new))
+  .subscribe();
+```
 
 ```bash
 firebase deploy --only functions:crisisStart,crisisUpdate,crisisResolve
@@ -404,19 +424,16 @@ firebase deploy --only functions:crisisStart,crisisUpdate,crisisResolve
 ## Cómo funciona el HTML de prueba
 
 El `backend/public/index.html` tiene una pestaña por feature. No usa frameworks — solo:
-- Firebase JS SDK v10 (módulos ES) para Storage, Realtime DB y Auth
+- **Supabase JS SDK v2** para Auth, Storage y Realtime
 - `fetch()` para llamar a las Cloud Functions
 - Google Maps JS API para renderizar el mapa y las rutas
 
-El cliente nunca tiene credenciales de servidor (Gemini, BigQuery, Maps Routes API).
-Solo tiene la config pública de Firebase y la Maps JS API key (restringida por dominio).
+El cliente nunca tiene credenciales de servidor (Gemini, BigQuery, Maps Routes API, `SUPABASE_SERVICE_KEY`).
+Solo tiene `SUPABASE_ANON_KEY` y la Maps JS API key (restringida por dominio).
 
 ---
 
 ## Skills disponibles por feature
-
-Cada skill contiene la implementación detallada, el código completo y notas de implementación.
-Consultar antes de implementar cada fase:
 
 | Feature | Skill |
 |---------|-------|
@@ -431,133 +448,109 @@ Consultar antes de implementar cada fase:
 
 ## Módulos compartidos (`src/shared/`)
 
-Toda la lógica transversal vive aquí. Ningún módulo de feature inicializa clientes
-ni duplica lógica de nodos por su cuenta.
-
 ### `clients.js`
-Inicializa Firebase Admin y el cliente de BigQuery **una sola vez** y los exporta.
-Todos los demás módulos importan de aquí — nunca llaman a `admin.initializeApp()` por su cuenta.
+Inicializa el cliente Supabase (service role) y BigQuery una sola vez.
 
 ```js
-// Ejemplo de uso en cualquier módulo
-const { db, bigquery } = require('../shared/clients');
+const { createClient } = require('@supabase/supabase-js');
+const { BigQuery } = require('@google-cloud/bigquery');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+const bigquery = new BigQuery({ projectId: process.env.GOOGLE_CLOUD_PROJECT });
+
+module.exports = { supabase, bigquery };
 ```
 
 ### `nodeUtils.js`
-Funciones reutilizables sobre `/accessibility_layer`:
-- `findNodesInBoundingBox(bounds)` — usada por `routing.js`. RTDB no tiene queries geoespaciales
-  nativos; se consulta por rango de geohash prefix (`orderByChild('geohash').startAt(prefix).endAt(prefix + '')`),
-  luego se filtra en memoria por bounding box exacto.
-- `findNearestNode(lat, lng, radiusMeters)` — usada por `report.js` (radio < 30m). Usa el mismo
-  rango de geohash y filtra por distancia Haversine.
-- `upsertNode(nodeData)` — actualiza nodo existente o crea uno nuevo; siempre calcula y persiste `geohash`.
+Funciones reutilizables sobre `accessibility_nodes`. PostGIS elimina la necesidad de
+geohash y filtrado en memoria:
+
+- `findNodesInBoundingBox(bounds)` — `ST_Within(location, ST_MakeEnvelope(...))`
+- `findNearestNode(lat, lng, radiusMeters)` — `ST_DWithin(location, ST_Point(lng,lat)::geography, r)`
+- `upsertNode(nodeData)` — `INSERT ... ON CONFLICT (id) DO UPDATE SET ...`
 
 ### `constants.js`
 Valores de negocio centralizados:
-- `severityToScore(severity)` → `10 - severity` (única definición en todo el proyecto)
-- Umbrales por perfil: `THRESHOLDS = { wheelchair: 6, elderly: 4, ... }`
+- `severityToScore(severity)` → `10 - severity`
+- `THRESHOLDS = { wheelchair: 6, elderly: 4, standard: 3 }`
 - `RUTA_VIVA_CACHE_TTL_MS = 30 * 60 * 1000`
 - `REPORT_NEARBY_RADIUS_METERS = 30`
-- `RUTA_VIVA_BQ_WEIGHT = 0.7`, `RUTA_VIVA_FIREBASE_WEIGHT = 0.3`
+- `RUTA_VIVA_BQ_WEIGHT = 0.7`, `RUTA_VIVA_SUPABASE_WEIGHT = 0.3`
 
 ---
 
 ## Seguridad
 
-### Reglas de Firebase Realtime Database
+### Row Level Security (RLS) en Supabase
 
-Reemplazar las reglas "modo test" antes de cualquier deploy. Copiar en
-Firebase Console → Realtime Database → Rules:
+Correr en el SQL Editor de Supabase junto con el schema:
 
-```json
-{
-  "rules": {
-    "accessibility_layer": {
-      ".read": true,
-      ".write": false
-    },
-    "reports": {
-      "$reportId": {
-        ".read": "auth != null && data.child('userId').val() === auth.uid",
-        ".write": "auth != null && !data.exists() && newData.child('userId').val() === auth.uid"
-      }
-    },
-    "crisis_sessions": {
-      "$sessionId": {
-        ".read": "auth != null && data.child('userId').val() === auth.uid",
-        ".write": false
-      }
-    },
-    "users": {
-      "$uid": {
-        ".read":  "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        "notifications": {
-          ".write": false
-        },
-        "reportCount": {
-          ".read": false,
-          ".write": false
-        }
-      }
-    },
-    "counters": {
-      ".read":  false,
-      ".write": false
-    }
-  }
-}
+```sql
+-- Habilitar RLS en todas las tablas
+ALTER TABLE public.accessibility_nodes  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.crisis_sessions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_profiles        ENABLE ROW LEVEL SECURITY;
+
+-- accessibility_nodes: lectura pública, escritura solo service role
+CREATE POLICY "nodes_read_public"  ON public.accessibility_nodes FOR SELECT USING (true);
+CREATE POLICY "nodes_write_admin"  ON public.accessibility_nodes FOR ALL
+  USING (auth.role() = 'service_role');
+
+-- reports: cada usuario lee/crea sus propios reportes
+CREATE POLICY "reports_own_read"   ON public.reports FOR SELECT
+  USING (auth.uid()::text = user_id);
+CREATE POLICY "reports_own_insert" ON public.reports FOR INSERT
+  WITH CHECK (auth.uid()::text = user_id);
+
+-- crisis_sessions: el dueño lee, solo service role escribe
+CREATE POLICY "crisis_own_read"    ON public.crisis_sessions FOR SELECT
+  USING (auth.uid()::text = user_id);
+CREATE POLICY "crisis_admin_write" ON public.crisis_sessions FOR ALL
+  USING (auth.role() = 'service_role');
+
+-- user_profiles: cada usuario lee y escribe su propio perfil
+CREATE POLICY "profile_own"        ON public.user_profiles FOR ALL
+  USING (auth.uid()::text = uid);
 ```
-
-Notas de las reglas:
-- `accessibility_layer` es lectura pública — datos de accesibilidad urbana son información abierta. Solo el Admin SDK escribe.
-- Cada usuario solo lee y escribe sus propios reportes.
-- `crisis_sessions` es escritura exclusiva del Admin SDK — create/update/delete se hacen únicamente desde Cloud Functions.
-- `notifications`, `reportCount` y `counters` son de escritura (y lectura) exclusiva del Admin SDK.
 
 ---
 
-### Reglas de Firebase Storage
+### Storage policies en Supabase
 
-Copiar en Firebase Console → Storage → Rules:
+En Supabase Dashboard → Storage → Policies del bucket `reports`:
 
+```sql
+-- Solo el dueño puede subir a su carpeta
+CREATE POLICY "reports_upload_own" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'reports'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+    AND octet_length(decode(encode(storage.filename(name),'escape'),'escape')) < 10485760);
+
+-- Cualquier usuario autenticado puede leer fotos
+CREATE POLICY "reports_read_auth"  ON storage.objects FOR SELECT
+  USING (bucket_id = 'reports' AND auth.role() = 'authenticated');
 ```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /reports/{userId}/{allPaths=**} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null
-                   && request.auth.uid == userId
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
-
-Notas:
-- Solo el dueño puede subir fotos a su carpeta `reports/{uid}/`.
-- Tamaño máximo por foto: 10 MB.
-- Solo se aceptan archivos de tipo `image/*`. Rechaza PDFs, scripts, etc.
-- Cualquier ruta fuera de `reports/` está bloqueada.
 
 ---
 
 ### Rate limiting en `/reports/submit`
 
-Antes de llamar a Gemini Vision, verificar en RTDB que el usuario no supere
-5 reportes por hora. Esto previene costos descontrolados por abuso.
+Contar reportes del usuario en la última hora directamente en Supabase:
 
 ```js
 // En report.js — antes de llamar geminiVision()
-const hourKey = new Date().toISOString().slice(0, 13); // "2026-05-28T10"
-const countRef = db.ref(`/users/${uid}/reportCount/${hourKey}`);
-const snap = await countRef.transaction(n => (n || 0) + 1);
-if (snap.snapshot.val() > 5) {
+const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+const { count } = await supabase
+  .from('reports')
+  .select('*', { count: 'exact', head: true })
+  .eq('user_id', uid)
+  .gte('created_at', oneHourAgo);
+
+if (count >= 5) {
   return res.status(429).json({ error: 'Límite de reportes por hora alcanzado' });
 }
 ```
@@ -566,8 +559,6 @@ if (snap.snapshot.val() > 5) {
 
 ### Validación de inputs
 
-Cada Cloud Function debe validar su payload antes de procesarlo.
-
 **`routing.js`** — coordenadas dentro del bounding box de Tijuana:
 ```js
 const TJ_BOUNDS = { latMin: 32.4, latMax: 32.7, lngMin: -117.2, lngMax: -116.8 };
@@ -575,26 +566,31 @@ function isValidCoord(lat, lng) {
   return lat >= TJ_BOUNDS.latMin && lat <= TJ_BOUNDS.latMax
       && lng >= TJ_BOUNDS.lngMin && lng <= TJ_BOUNDS.lngMax;
 }
-// → 400 si origin o destination están fuera de bounds
 ```
 
-**`report.js`** — la `photoUrl` debe pertenecer al bucket del proyecto:
+**`report.js`** — la `photoUrl` debe pertenecer al bucket de Supabase del proyecto:
 ```js
-// El bucket por defecto cambió a `paso.firebasestorage.app` en proyectos nuevos.
-// Confirmar en Firebase Console → Storage cuál aplica y setear en .env:
-//   STORAGE_BUCKET=paso.appspot.com   (o paso.firebasestorage.app)
-const bucket = process.env.STORAGE_BUCKET || admin.storage().bucket().name;
-const STORAGE_PREFIX = `https://firebasestorage.googleapis.com/v0/b/${bucket}`;
+const STORAGE_PREFIX = `${process.env.SUPABASE_URL}/storage/v1/object/public/reports/`;
 if (!photoUrl.startsWith(STORAGE_PREFIX)) {
   return res.status(400).json({ error: 'photoUrl no pertenece al bucket autorizado' });
 }
 ```
 
+**`auth.js`** — verificar JWT de Supabase en cada endpoint:
+```js
+const { data: { user }, error } = await supabase.auth.getUser(token);
+if (error || !user) return res.status(401).json({ error: 'Unauthorized' });
+const uid = user.id;
+```
+
 **`crisis.js`** — verificar ownership antes de actualizar o resolver:
 ```js
-// En PUT /crisis/:id/update y DELETE /crisis/:id/resolve
-const session = await db.ref(`/crisis_sessions/${sessionId}`).once('value');
-if (!session.exists() || session.val().userId !== uid) {
+const { data: session } = await supabase
+  .from('crisis_sessions')
+  .select('user_id')
+  .eq('id', sessionId)
+  .single();
+if (!session || session.user_id !== uid) {
   return res.status(403).json({ error: 'Sesión no encontrada o acceso denegado' });
 }
 ```
@@ -603,33 +599,31 @@ if (!session.exists() || session.val().userId !== uid) {
 
 ### Checklist de seguridad antes de demo/deploy
 
-- [ ] Reglas de RTDB actualizadas (salir de modo test)
-- [ ] Reglas de Storage aplicadas
-- [ ] `serviceAccountKey.json` y `.env` fuera del repo (verificar con `git status`)
+- [ ] RLS habilitado en todas las tablas (verificar en Supabase → Authentication → Policies)
+- [ ] Storage policies aplicadas en bucket `reports`
+- [ ] `SUPABASE_SERVICE_KEY` y `.env` fuera del repo (`git status`)
+- [ ] `SUPABASE_ANON_KEY` en el frontend — confirmar que NO es `service_role`
 - [ ] Maps JS API key restringida por dominio en Google Cloud Console
-- [ ] Gemini API key sin restricciones de IP solo en desarrollo — agregar restricción en prod
+- [ ] Gemini API key sin restricciones de IP solo en desarrollo
 - [ ] Rate limiting activo en `/reports/submit`
 - [ ] Validación de coordenadas activa en `/routing/accessible`
-- [ ] `STORAGE_BUCKET` en `.env` coincide con el bucket real del proyecto (verificar en Firebase Console → Storage)
 
 ---
 
 ## Notas generales
 
-- **CORS**: siempre aplicar middleware `cors({ origin: true })` en todas las Cloud Functions
+- **CORS**: siempre aplicar `cors({ origin: true })` en todas las Cloud Functions
 - **Fire and forget**: las escrituras en BigQuery no bloquean la respuesta al cliente
-- **Foto en Storage primero**: nunca enviar imágenes en base64 al body de la Cloud Function
-- **Score vs Severity**: definido en `shared/constants.js` como `severityToScore()`. Score alto = más accesible.
-- **field_verified > estimated**: el motor de ruteo puede ponderar más los nodos verificados en campo
-- **Timezone**: el cliente debe enviar ISO 8601 con offset explícito (`2026-05-28T10:00:00-07:00`),
-  no "local time". `new Date(isoString)` en el servidor respeta el offset del string, no del servidor.
-- **BigQuery latencia**: 1-3 segundos por query. Usar el cache de Ruta Viva siempre.
-- **`conversation.js` llama `routing.js` por import directo**, no por HTTP — evita latencia y acoplamiento innecesario
-- **Auth**: el cliente llama `signInAnonymously()` al cargar; adjunta el `idToken` en cada request como
-  `Authorization: Bearer <token>`. Las Cloud Functions verifican con `admin.auth().verifyIdToken()`.
-  Sin uid válido → 401.
-- **Ticket ID atómico**: el counter vive en `/counters/ticketSeq` en RTDB. Se incrementa con
-  `transaction()` antes de insertar en BigQuery. BigQuery no tiene transacciones de fila — nunca
-  generar el ID allí.
-- **Geohash**: todos los nodos en `/accessibility_layer` deben incluir `geohash` (precision 7, librería
-  `ngeohash`). El seed lo calcula al insertar. Sin geohash los queries de bounding box traen toda la colección.
+- **Foto en Storage primero**: el cliente sube la foto a Supabase Storage y envía solo la URL
+- **Score vs Severity**: `severityToScore()` en `shared/constants.js`. Score alto = más accesible.
+- **PostGIS vs geohash**: no usar `ngeohash`. Toda búsqueda geoespacial usa `ST_DWithin` / `ST_Within`
+- **Timezone**: el cliente envía ISO 8601 con offset explícito (`2026-05-28T10:00:00-07:00`)
+- **BigQuery latencia**: 1-3s por query. Usar el cache de Ruta Viva siempre.
+- **`conversation.js` llama `routing.js` por import directo**, no por HTTP
+- **Auth**: el cliente llama `supabase.auth.signInAnonymously()` al cargar; adjunta el JWT en
+  cada request como `Authorization: Bearer <token>`. Las Cloud Functions verifican con
+  `supabase.auth.getUser(token)`. Sin uid válido → 401.
+- **Ticket ID atómico**: `SELECT nextval('ticket_seq')` en Supabase. PostgreSQL garantiza
+  atomicidad sin necesidad de transacciones manuales.
+- **Supabase Realtime**: habilitar en Supabase Dashboard → Database → Replication →
+  activar `crisis_sessions` para que los cambios se emitan al cliente en tiempo real.

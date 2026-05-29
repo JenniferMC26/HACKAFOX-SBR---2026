@@ -1,111 +1,122 @@
-// Operaciones sobre /accessibility_layer. RTDB no tiene queries geoespaciales,
-// así que filtramos por rango de geohash y refinamos en memoria.
+// Wrappers sobre las stored functions PostGIS definidas en supabase-schema.sql.
+// Toda lógica geoespacial se ejecuta en Postgres — JS solo orquesta.
 
-const ngeohash = require('ngeohash');
-const { db } = require('./clients');
-const { GEOHASH_PRECISION } = require('./constants');
+const { supabase } = require('./clients');
 
-const EARTH_RADIUS_M = 6_371_000;
-
-function toRad(deg) {
-  return (deg * Math.PI) / 180;
-}
-
-// Haversine entre dos puntos en metros.
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
-}
-
-// Devuelve los geohash prefixes únicos que cubren el bounding box.
-// Usamos precision 5 al consultar (más laxo) porque queremos un superset que
-// luego filtramos por bbox exacto en memoria.
-function geohashesForBounds({ latMin, latMax, lngMin, lngMax }, precision = 5) {
-  const sw = ngeohash.encode(latMin, lngMin, precision);
-  const ne = ngeohash.encode(latMax, lngMax, precision);
-  const seen = new Set([sw, ne]);
-  // ngeohash.bboxes devuelve todos los prefixes que tocan el bbox.
-  for (const h of ngeohash.bboxes(latMin, lngMin, latMax, lngMax, precision)) {
-    seen.add(h);
-  }
-  return [...seen].sort();
-}
-
-// Trae todos los nodos cuyo geohash empieza con alguno de los prefixes que tocan
-// el bbox, luego refina filtrando por bounds reales.
 async function findNodesInBoundingBox(bounds) {
-  const prefixes = geohashesForBounds(bounds);
-  const results = [];
-  const seenIds = new Set();
-
-  for (const prefix of prefixes) {
-    const snap = await db
-      .ref('accessibility_layer')
-      .orderByChild('geohash')
-      .startAt(prefix)
-      .endAt(prefix + '')
-      .once('value');
-
-    snap.forEach((child) => {
-      if (seenIds.has(child.key)) return;
-      const v = child.val();
-      if (
-        v.lat >= bounds.latMin &&
-        v.lat <= bounds.latMax &&
-        v.lng >= bounds.lngMin &&
-        v.lng <= bounds.lngMax
-      ) {
-        seenIds.add(child.key);
-        results.push({ nodeId: child.key, ...v });
-      }
-    });
-  }
-
-  return results;
-}
-
-// Encuentra el nodo más cercano dentro de un radio. Devuelve null si ninguno.
-async function findNearestNode(lat, lng, radiusMeters) {
-  // Bounding box aproximado a partir del radio (1 grado ≈ 111 km).
-  const dLat = radiusMeters / 111_000;
-  const dLng = radiusMeters / (111_000 * Math.cos(toRad(lat)));
-  const candidates = await findNodesInBoundingBox({
-    latMin: lat - dLat,
-    latMax: lat + dLat,
-    lngMin: lng - dLng,
-    lngMax: lng + dLng,
+  const { data, error } = await supabase.rpc('nodes_in_bbox', {
+    p_lat_min: bounds.latMin,
+    p_lat_max: bounds.latMax,
+    p_lng_min: bounds.lngMin,
+    p_lng_max: bounds.lngMax,
   });
-
-  let best = null;
-  let bestDist = Infinity;
-  for (const node of candidates) {
-    const d = distanceMeters(lat, lng, node.lat, node.lng);
-    if (d <= radiusMeters && d < bestDist) {
-      best = { ...node, distanceMeters: d };
-      bestDist = d;
-    }
-  }
-  return best;
+  if (error) throw new Error(`nodes_in_bbox: ${error.message}`);
+  return (data || []).map((n) => ({
+    nodeId: n.id,
+    lat: n.lat,
+    lng: n.lng,
+    type: n.type,
+    accessible: n.accessible,
+    score: n.score,
+    source: n.source,
+    barrierType: n.barrier_type,
+    lastReported: n.last_reported,
+    reportCount: n.report_count,
+    photoUrl: n.photo_url,
+    geminiAnalysis: n.gemini_analysis,
+  }));
 }
 
-// Crea o actualiza un nodo, garantizando que el geohash queda persistido.
-async function upsertNode(nodeId, nodeData) {
-  const withHash = {
-    ...nodeData,
-    geohash: ngeohash.encode(nodeData.lat, nodeData.lng, GEOHASH_PRECISION),
+async function findNearestNode(lat, lng, radiusMeters) {
+  const { data, error } = await supabase.rpc('nearest_node', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_m: radiusMeters,
+  });
+  if (error) throw new Error(`nearest_node: ${error.message}`);
+  const n = data && data[0];
+  if (!n) return null;
+  return {
+    nodeId: n.id,
+    lat: n.lat,
+    lng: n.lng,
+    type: n.type,
+    accessible: n.accessible,
+    score: n.score,
+    source: n.source,
+    barrierType: n.barrier_type,
+    lastReported: n.last_reported,
+    reportCount: n.report_count,
+    photoUrl: n.photo_url,
+    geminiAnalysis: n.gemini_analysis,
+    distanceMeters: n.distance_m,
   };
-  await db.ref(`accessibility_layer/${nodeId}`).update(withHash);
-  return { nodeId, ...withHash };
+}
+
+// Upsert atómico (find-near-or-create) — encapsulado en SQL para evitar race.
+async function upsertNodeNear({
+  lat,
+  lng,
+  radiusMeters,
+  type,
+  accessible,
+  score,
+  barrierType,
+  photoUrl,
+  geminiAnalysis,
+  source = 'field_verified',
+}) {
+  const { data, error } = await supabase.rpc('upsert_node_near', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_m: radiusMeters,
+    p_type: type,
+    p_accessible: accessible,
+    p_score: score,
+    p_barrier_type: barrierType,
+    p_photo_url: photoUrl,
+    p_gemini_analysis: geminiAnalysis,
+    p_source: source,
+  });
+  if (error) throw new Error(`upsert_node_near: ${error.message}`);
+  const n = data && (Array.isArray(data) ? data[0] : data);
+  if (!n) throw new Error('upsert_node_near no devolvió fila');
+  return {
+    nodeId: n.id,
+    lat: n.lat,
+    lng: n.lng,
+    type: n.type,
+    accessible: n.accessible,
+    score: n.score,
+    source: n.source,
+    barrierType: n.barrier_type,
+    photoUrl: n.photo_url,
+    geminiAnalysis: n.gemini_analysis,
+    reportCount: n.report_count,
+  };
+}
+
+async function recentReportsNear(lat, lng, radiusMeters, windowSeconds) {
+  const { data, error } = await supabase.rpc('recent_reports_near', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_m: radiusMeters,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw new Error(`recent_reports_near: ${error.message}`);
+  return data || [];
+}
+
+async function nextTicketId() {
+  const { data, error } = await supabase.rpc('next_ticket_id');
+  if (error) throw new Error(`next_ticket_id: ${error.message}`);
+  return data;
 }
 
 module.exports = {
-  distanceMeters,
-  geohashesForBounds,
   findNodesInBoundingBox,
   findNearestNode,
-  upsertNode,
+  upsertNodeNear,
+  recentReportsNear,
+  nextTicketId,
 };

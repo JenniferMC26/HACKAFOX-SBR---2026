@@ -2,21 +2,31 @@
 # Paso — docker-compose.yml
 #
 # Define dos servicios:
-#   emulator  → Firebase Emulator Suite (DB + Functions + Storage + Auth locales)
-#   seed      → Runner para los scripts de seed (firebase-seed, bigquery, etc.)
+#   emulator  → Firebase Emulator Suite (Functions + Hosting locales)
+#   seed      → Runner para los scripts de seed (Supabase, BigQuery)
+#
+# Supabase corre en la nube — todas las conexiones de DB/Storage/Auth salen del
+# contenedor a internet usando las credenciales del .env.
 #
 # Comandos frecuentes:
 #   docker compose up               → levantar el emulador
 #   docker compose up --build       → reconstruir imagen y levantar
-#   docker compose run --rm seed node seed/firebase-seed.js
+#   docker compose run --rm seed node seed/supabase-seed.js
 #   docker compose run --rm seed node seed/users-seed.js
 #   docker compose run --rm seed python3 seed/bigquery_seed.py
 #   docker compose down             → apagar todo
 # ─────────────────────────────────────────────────────────────────────────────
 
-services:
+x-env: &shared-env
+  SUPABASE_URL: ${SUPABASE_URL}
+  SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+  SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+  GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-paso}
+  SKIP_AUTH: ${SKIP_AUTH:-false}
 
-  # ── Emulador local de Firebase ──────────────────────────────────────────────
+services:
   emulator:
     build: .
     container_name: paso_emulator
@@ -24,45 +34,25 @@ services:
       - "4000:4000"   # Emulator UI  → http://localhost:4000
       - "5000:5000"   # Hosting      → http://localhost:5000  (test console)
       - "5001:5001"   # Functions    → http://localhost:5001/paso/us-central1/<fn>
-      - "9000:9000"   # Realtime DB
-      - "9099:9099"   # Auth
-      - "9199:9199"   # Storage
     volumes:
       - .:/app
       - node_modules_cache:/app/node_modules
       - functions_node_modules_cache:/app/functions/node_modules
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
-      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-paso}
-      - STORAGE_BUCKET=${STORAGE_BUCKET:-paso.firebasestorage.app}
-      - FUNCTIONS_EMULATOR=true
+      <<: *shared-env
+      FUNCTIONS_EMULATOR: "true"
     env_file:
       - .env
 
-  # ── Runner de scripts de seed ───────────────────────────────────────────────
-  # Comparte la red con el servicio `emulator`. Sus SDKs apuntan a los puertos
-  # del emulador via los env vars FIREBASE_*_EMULATOR_HOST — nunca tocan prod.
   seed:
     build: .
     container_name: paso_seed
-    depends_on:
-      - emulator
     volumes:
       - .:/app
       - node_modules_cache:/app/node_modules
       - functions_node_modules_cache:/app/functions/node_modules
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-paso}
-      - STORAGE_BUCKET=${STORAGE_BUCKET:-paso.firebasestorage.app}
-      # Apuntar Admin SDK al emulador (host = nombre del servicio en la red de compose)
-      - FIREBASE_DATABASE_EMULATOR_HOST=emulator:9000
-      - FIREBASE_AUTH_EMULATOR_HOST=emulator:9099
-      - FIREBASE_STORAGE_EMULATOR_HOST=emulator:9199
-      - GCLOUD_PROJECT=paso
+      <<: *shared-env
     env_file:
       - .env
     entrypoint: []

@@ -1,14 +1,13 @@
 {
   "name": "paso-backend",
-  "description": "Scripts de seed y utilidades de backend (no es la Cloud Function)",
+  "description": "Scripts de seed y utilidades — no es la Cloud Function",
   "private": true,
   "scripts": {
-    "seed:nodes": "node seed/firebase-seed.js",
+    "seed:nodes": "node seed/supabase-seed.js",
     "seed:users": "node seed/users-seed.js",
     "seed:bq": "python3 seed/bigquery_seed.py"
   },
   "dependencies": {
-    "firebase-admin": "^12.6.0",
-    "ngeohash": "^0.6.3"
+    "@supabase/supabase-js": "^2.45.0"
   }
 }

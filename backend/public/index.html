@@ -32,7 +32,7 @@
 <body>
   <header>
     <h1>Paso — Test Console</h1>
-    <span class="badge">emulator</span>
+    <span class="badge">supabase</span>
     <span class="uid" id="uid">conectando…</span>
   </header>
 
@@ -45,7 +45,7 @@
   </nav>
 
   <main>
-    <!-- ── Routing ────────────────────────────────────────────────────────── -->
+    <!-- Routing -->
     <section id="routing" class="active">
       <h2>POST /routingAccessible</h2>
       <div class="row">
@@ -76,21 +76,21 @@
       <pre id="r-out">—</pre>
     </section>
 
-    <!-- ── Report ─────────────────────────────────────────────────────────── -->
+    <!-- Report -->
     <section id="report">
       <h2>POST /reportSubmit</h2>
-      <p class="hint">Sube una imagen al emulador de Storage y envía la URL al endpoint. En modo MOCK, Gemini devuelve análisis determinista basado en la URL.</p>
+      <p class="hint">Sube una imagen al bucket <code>reports/{uid}/...</code> y envía la URL al endpoint.</p>
       <div class="row">
         <div><label>Lat</label><input id="rep-lat" value="32.5305" /></div>
         <div><label>Lng</label><input id="rep-lng" value="-117.0349" /></div>
       </div>
-      <label>Foto (jpg/png)</label>
+      <label>Foto (jpg/png, max 10 MB)</label>
       <input type="file" id="rep-file" accept="image/*" />
       <button class="primary" onclick="callReport()">Subir y reportar</button>
       <pre id="rep-out">—</pre>
     </section>
 
-    <!-- ── Ruta Viva ──────────────────────────────────────────────────────── -->
+    <!-- Ruta Viva -->
     <section id="rutaviva">
       <h2>GET /rutaVivaScore</h2>
       <div class="row">
@@ -99,12 +99,12 @@
       </div>
       <label>arrivalTime (ISO con offset)</label>
       <input id="rv-arrival" value="2026-05-28T10:00:00-07:00" />
-      <p class="hint">Tip: prueba miércoles 10am en Mercado Hidalgo (32.5266, -117.0382) — debe bajar.</p>
+      <p class="hint">Tip: miércoles 10am en Mercado Hidalgo (32.5266, -117.0382) — debe bajar.</p>
       <button class="primary" onclick="callRutaViva()">Consultar score</button>
       <pre id="rv-out">—</pre>
     </section>
 
-    <!-- ── Voz ────────────────────────────────────────────────────────────── -->
+    <!-- Voice -->
     <section id="voice">
       <h2>POST /voiceQuery</h2>
       <label>Texto del usuario (simulando voz)</label>
@@ -123,7 +123,7 @@
       <pre id="v-out">—</pre>
     </section>
 
-    <!-- ── Crisis ─────────────────────────────────────────────────────────── -->
+    <!-- Crisis -->
     <section id="crisis">
       <h2>Modo Crisis</h2>
       <div class="row">
@@ -137,31 +137,27 @@
       </div>
       <label>sessionId activo</label>
       <input id="c-sid" placeholder="se llena después de Start" />
+      <p class="hint">Una vez creada la sesión, los cambios se emiten vía Supabase Realtime a cualquier suscriptor del canal <code>crisis_sessions:id=eq.&lt;sessionId&gt;</code>.</p>
       <pre id="c-out">—</pre>
     </section>
   </main>
 
   <script type="module">
-    import { auth } from './firebase-config.js';
-    import { ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
-    import { getStorage } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
+    import { supabase, FUNCTIONS_BASE, ensureAnonSession } from './supabase-config.js';
 
-    const FN_BASE = location.hostname === 'localhost'
-      ? 'http://localhost:5001/paso/us-central1'
-      : 'https://us-central1-paso.cloudfunctions.net';
+    let session = null;
 
-    let idToken = null;
-
-    auth.authStateReady().then(async () => {
-      if (!auth.currentUser) return;
-      idToken = await auth.currentUser.getIdToken();
-      document.getElementById('uid').textContent = `uid: ${auth.currentUser.uid}`;
-    });
+    (async () => {
+      session = await ensureAnonSession();
+      const uidEl = document.getElementById('uid');
+      uidEl.textContent = session ? `uid: ${session.user.id}` : 'sin sesión (¿anon disabled?)';
+    })();
 
     async function call(path, opts = {}) {
+      const token = session && session.access_token;
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-      const res = await fetch(`${FN_BASE}/${path}`, { ...opts, headers });
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${FUNCTIONS_BASE}/${path}`, { ...opts, headers });
       const text = await res.text();
       try { return { status: res.status, body: JSON.parse(text) }; }
       catch { return { status: res.status, body: text }; }
@@ -171,7 +167,6 @@
       document.getElementById(id).textContent = JSON.stringify(data, null, 2);
     }
 
-    // Tab switching
     document.querySelectorAll('nav button').forEach((b) => {
       b.addEventListener('click', () => {
         document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
@@ -181,7 +176,6 @@
       });
     });
 
-    // Routing
     window.callRouting = async () => {
       const body = {
         origin: { lat: parseFloat(r_olat.value), lng: parseFloat(r_olng.value) },
@@ -192,16 +186,19 @@
       show('r-out', await call('routingAccessible', { method: 'POST', body: JSON.stringify(body) }));
     };
 
-    // Report — subir foto al Storage emulator → mandar URL al endpoint
     window.callReport = async () => {
       const file = rep_file.files[0];
       if (!file) { show('rep-out', { error: 'Selecciona una foto' }); return; }
-      if (!auth.currentUser) { show('rep-out', { error: 'Esperando auth…' }); return; }
-      const path = `reports/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
-      const storage = getStorage();
-      const r = sRef(storage, path);
-      await uploadBytes(r, file);
-      const photoUrl = await getDownloadURL(r);
+      if (!session) { show('rep-out', { error: 'Esperando auth…' }); return; }
+      const objectPath = `${session.user.id}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from('reports').upload(objectPath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      });
+      if (upErr) { show('rep-out', { error: upErr.message }); return; }
+      const { data: pub } = supabase.storage.from('reports').getPublicUrl(objectPath);
+      const photoUrl = pub.publicUrl;
       show('rep-out', await call('reportSubmit', {
         method: 'POST',
         body: JSON.stringify({
@@ -212,13 +209,11 @@
       }));
     };
 
-    // Ruta Viva
     window.callRutaViva = async () => {
       const url = `rutaVivaScore?lat=${rv_lat.value}&lng=${rv_lng.value}&arrivalTime=${encodeURIComponent(rv_arrival.value)}`;
       show('rv-out', await call(url));
     };
 
-    // Voice
     window.callVoice = async () => {
       show('v-out', await call('voiceQuery', {
         method: 'POST',
@@ -230,13 +225,27 @@
       }));
     };
 
-    // Crisis
     window.crisisStart = async () => {
       const res = await call('crisisStart', {
         method: 'POST',
         body: JSON.stringify({ lat: parseFloat(c_lat.value), lng: parseFloat(c_lng.value) }),
       });
-      if (res.body && res.body.sessionId) c_sid.value = res.body.sessionId;
+      if (res.body && res.body.sessionId) {
+        c_sid.value = res.body.sessionId;
+        // Suscribirse a Realtime para esta sesión.
+        supabase
+          .channel(`crisis-${res.body.sessionId}`)
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'crisis_sessions',
+            filter: `id=eq.${res.body.sessionId}`,
+          }, (payload) => {
+            console.log('[realtime] crisis update', payload.new);
+            show('c-out', { status: 'realtime', payload: payload.new });
+          })
+          .subscribe();
+      }
       show('c-out', res);
     };
     window.crisisUpdate = async () => {

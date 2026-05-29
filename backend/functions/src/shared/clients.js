@@ -1,27 +1,27 @@
-// Inicializa Firebase Admin y BigQuery una sola vez por proceso. Cualquier
-// módulo que necesite db / bigquery debe importar de aquí — nunca llamar
-// admin.initializeApp() por su cuenta.
+// Inicializa el cliente Supabase (service_role) y el de BigQuery una sola vez
+// por proceso. Cualquier módulo que necesite supabase / bigquery debe importar
+// de aquí — nunca crear su propio createClient().
 
-const admin = require('firebase-admin');
+const { createClient } = require('@supabase/supabase-js');
 const { BigQuery } = require('@google-cloud/bigquery');
 
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+  console.warn('[clients] SUPABASE_URL o SUPABASE_SERVICE_KEY no seteados — los endpoints fallarán.');
 }
 
-const db = admin.database();
-const auth = admin.auth();
-const storage = admin.storage();
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || '',
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }
+);
 
-// `paso` es el dataset por defecto — coincide con seed/queries.sql.
-const bigquery = new BigQuery();
+const bigquery = new BigQuery({ projectId: process.env.GOOGLE_CLOUD_PROJECT });
 const BQ_DATASET = process.env.BIGQUERY_DATASET || 'paso';
 
 module.exports = {
-  admin,
-  db,
-  auth,
-  storage,
+  supabase,
   bigquery,
   BQ_DATASET,
 };

@@ -3,15 +3,14 @@
 // Pipeline:
 //   1. Pedir ruta base a Google Routes API (o MOCK si no hay key).
 //   2. Decodificar polyline → bounding box.
-//   3. Buscar nodos de /accessibility_layer dentro del bbox.
+//   3. Buscar nodos de accessibility_nodes (Supabase + PostGIS) en el bbox.
 //   4. Calcular score promedio ponderado por perfil + warnings.
 //   5. Si arrivalTime presente → llamar getRutaVivaScore() y mezclar.
 //
 // El MOCK activa cuando GOOGLE_MAPS_API_KEY está vacío. Genera una "ruta" recta
-// interpolada (10 puntos) entre origen y destino. Permite probar el pipeline
-// completo contra el emulador sin tocar prod.
+// interpolada (10 puntos) entre origen y destino.
 
-const { findNodesInBoundingBox, distanceMeters } = require('../shared/nodeUtils');
+const { findNodesInBoundingBox } = require('../shared/nodeUtils');
 const { THRESHOLDS, TJ_BOUNDS } = require('../shared/constants');
 const { encode, decode } = require('../shared/polyline');
 
@@ -25,6 +24,15 @@ const PROFILE_RULES = {
   stroller:   { minScore: THRESHOLDS.stroller,   avoidBarrierTypes: [] },
   none:       { minScore: THRESHOLDS.none,       avoidBarrierTypes: [] },
 };
+
+const EARTH_RADIUS_M = 6_371_000;
+const toRad = (d) => (d * Math.PI) / 180;
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
+}
 
 function isValidCoord(c) {
   return (
@@ -64,7 +72,6 @@ async function fetchMapsRoute(origin, destination) {
 }
 
 function mockRoute(origin, destination) {
-  // 10 puntos interpolados linealmente entre origen y destino.
   const points = [];
   const N = 10;
   for (let i = 0; i <= N; i++) {
@@ -78,7 +85,7 @@ function mockRoute(origin, destination) {
   return {
     encodedPolyline: encode(points),
     distanceMeters: distance,
-    durationSeconds: Math.round(distance / 1.4), // ≈ 1.4 m/s caminando
+    durationSeconds: Math.round(distance / 1.4),
     _mock: true,
   };
 }
@@ -111,7 +118,6 @@ function scoreRoute(nodes, rules) {
   let totalWeight = 0;
   const warnings = [];
   for (const node of nodes) {
-    // Field-verified pesa más que estimated.
     const weight = node.source === 'field_verified' ? 1.5 : 1.0;
     total += node.score * weight;
     totalWeight += weight;
@@ -180,4 +186,4 @@ async function getAccessibleRoute(origin, destination, userProfile, arrivalTime)
   };
 }
 
-module.exports = { getAccessibleRoute };
+module.exports = { getAccessibleRoute, distanceMeters };
