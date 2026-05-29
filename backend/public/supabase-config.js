@@ -1,26 +1,34 @@
 // Config pública del SDK cliente Supabase.
-// SOLO la SUPABASE_ANON_KEY va aquí — nunca la service_role.
-// Las Cloud Functions se redirigen al emulador local en localhost.
+//
+// La URL y la anon key se obtienen del endpoint /config de las Cloud Functions
+// (que las lee de .env). Así no hay nada hardcoded en archivos versionados.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-// Project shared del equipo (ajustar si cambia).
-const SUPABASE_URL = 'https://xagroifcepcxhzeserda.supabase.co';
-// ⚠️ Pegar aquí la ANON KEY (no la service_role). La encuentras en
-//    Supabase Dashboard → Project Settings → API → Project API keys → anon public.
-const SUPABASE_ANON_KEY = '';
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
 
 export const FUNCTIONS_BASE =
   location.hostname === 'localhost'
     ? 'http://localhost:5001/paso/us-central1'
     : 'https://us-central1-paso.cloudfunctions.net';
+
+// Fetch config from backend. Lanza si /config no responde o falta alguna key.
+async function loadConfig() {
+  const res = await fetch(`${FUNCTIONS_BASE}/config`);
+  if (!res.ok) throw new Error(`/config ${res.status}`);
+  const cfg = await res.json();
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+    throw new Error('/config devolvió valores vacíos — revisa SUPABASE_URL / SUPABASE_ANON_KEY en .env');
+  }
+  return cfg;
+}
+
+const cfg = await loadConfig();
+
+export const supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 // Auth anónimo al cargar — todas las requests llevan el JWT.
 export async function ensureAnonSession() {

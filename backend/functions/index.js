@@ -24,6 +24,15 @@ function wrap(handler) {
   });
 }
 
+// ── Config pública — entrega las creds anon al browser sin hardcodearlas ─────
+// Solo expone la ANON key (segura por RLS). Nunca incluir SERVICE_KEY aquí.
+exports.config = wrap(async (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+  });
+});
+
 // ── Fase 2: ruteo accesible ───────────────────────────────────────────────────
 exports.routingAccessible = wrap(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
