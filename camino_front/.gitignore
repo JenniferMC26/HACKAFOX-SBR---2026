@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Custom Environment Secrets Matrix
+android/local.properties
+ios/Flutter/secrets.xcconfig
+web/secrets.js
