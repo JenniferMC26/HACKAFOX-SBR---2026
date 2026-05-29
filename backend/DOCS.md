@@ -162,7 +162,7 @@ Paso/
 
 ## 4. Base de Datos
 
-**Proyecto Supabase:** `xagroifcepcxhzeserda`
+**Proyecto Supabase:** `PON TU API KEY AQUI`
 **Extensiones requeridas:** `postgis`, `uuid-ossp`
 
 Todas las columnas `location` son de tipo `GEOGRAPHY(POINT, 4326)` y se generan automáticamente a partir de `lat`/`lng` — nunca se insertan manualmente.
@@ -592,7 +592,7 @@ Umbrales por perfil de movilidad:
 ### `.env`
 
 ```env
-SUPABASE_URL=https://xagroifcepcxhzeserda.supabase.co
+SUPABASE_URL=PON TU API KEY AQUI
 SUPABASE_ANON_KEY=          # Dashboard → Settings → API → anon public
 SUPABASE_SERVICE_KEY=       # Dashboard → Settings → API → service_role (privada)
 GEMINI_API_KEY=             # Google AI Studio → API Keys
