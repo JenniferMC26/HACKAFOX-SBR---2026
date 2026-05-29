@@ -75,15 +75,29 @@ CREATE TABLE IF NOT EXISTS public.crisis_sessions (
 );
 
 -- 1.4 Perfiles de usuario.
+-- nombre / telefono / tipo_discapacidad / condicion_adulto_mayor / telefono_emergencia
+-- fueron agregados en migración 001-extend-user-profiles.sql
 CREATE TABLE IF NOT EXISTS public.user_profiles (
-  uid                TEXT PRIMARY KEY,
-  display_name       TEXT,
-  mobility_type      TEXT,
-  avoid_steps        BOOLEAN DEFAULT FALSE,
-  avoid_slopes       BOOLEAN DEFAULT FALSE,
-  slope_max_percent  FLOAT8 DEFAULT 8.0,
-  emergency_contacts JSONB DEFAULT '[]'::jsonb,
-  created_at         TIMESTAMPTZ DEFAULT NOW()
+  uid                     TEXT PRIMARY KEY,
+  display_name            TEXT,                      -- nombre de pantalla (legacy)
+  nombre                  TEXT,                      -- nombre completo
+  telefono                TEXT,                      -- teléfono del usuario
+  tipo_discapacidad       TEXT CHECK (tipo_discapacidad IS NULL OR tipo_discapacidad = ANY (ARRAY[
+                            'motriz_silla','motriz_baston','adulto_mayor',
+                            'visual','auditiva','cognitiva','temporal','ninguna','otra'])),
+  condicion_adulto_mayor  TEXT CHECK (condicion_adulto_mayor IS NULL OR condicion_adulto_mayor = ANY (ARRAY[
+                            'artritis','osteoporosis','vision_reducida','audicion_reducida',
+                            'diabetes','equilibrio','demencia_leve','otra'])),
+  telefono_emergencia     TEXT,                      -- contacto de emergencia (teléfono directo)
+  mobility_type           TEXT,                      -- para algoritmo de ruteo: wheelchair/elderly/cane/stroller/none
+  avoid_steps             BOOLEAN DEFAULT FALSE,
+  avoid_slopes            BOOLEAN DEFAULT FALSE,
+  slope_max_percent       FLOAT8 DEFAULT 8.0,
+  emergency_contacts      JSONB DEFAULT '[]'::jsonb, -- lista extendida de contactos (nombre + tel)
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT user_profiles_condicion_am_solo_adulto CHECK (
+    condicion_adulto_mayor IS NULL OR tipo_discapacidad = 'adulto_mayor'
+  )
 );
 
 -- 1.5 Notificaciones (para Modo Crisis — alertar contactos).

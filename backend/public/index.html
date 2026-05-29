@@ -141,37 +141,6 @@ input:focus { outline:none; border-color:var(--brand); }
     <div class="field"><label>Teléfono</label>
       <input id="p-tel" type="text" placeholder="664 123 4567"></div>
 
-    <div class="field"><label>Tipo de discapacidad</label>
-      <select id="p-discap" onchange="onDiscapChange()">
-        <option value="">— Selecciona —</option>
-        <option value="motriz_silla">Motriz — silla de ruedas</option>
-        <option value="motriz_baston">Motriz — bastón / andadera</option>
-        <option value="adulto_mayor">Adulto mayor</option>
-        <option value="visual">Visual</option>
-        <option value="auditiva">Auditiva</option>
-        <option value="cognitiva">Cognitiva / intelectual</option>
-        <option value="temporal">Lesión temporal</option>
-        <option value="ninguna">Sin discapacidad</option>
-        <option value="otra">Otra</option>
-      </select>
-    </div>
-
-    <!-- Campo secundario — solo visible cuando tipo = adulto_mayor -->
-    <div id="row-am" class="field" style="display:none">
-      <label>Condición principal (adulto mayor)</label>
-      <select id="p-cond-am">
-        <option value="">— Selecciona —</option>
-        <option value="artritis">Artritis / reumatismo</option>
-        <option value="osteoporosis">Osteoporosis</option>
-        <option value="vision_reducida">Visión reducida</option>
-        <option value="audicion_reducida">Audición reducida</option>
-        <option value="diabetes">Diabetes</option>
-        <option value="equilibrio">Problemas de equilibrio</option>
-        <option value="demencia_leve">Demencia leve</option>
-        <option value="otra">Otra</option>
-      </select>
-    </div>
-
     <div class="field"><label>Teléfono de emergencia</label>
       <input id="p-tel-em" type="text" placeholder="664 987 6543 (familiar o cuidador)"></div>
 
@@ -184,6 +153,22 @@ input:focus { outline:none; border-color:var(--brand); }
       <button class="mob-btn" data-mob="cane"       onclick="selMob(this)"><span class="ic">🦯</span>Bastón / andadera</button>
       <button class="mob-btn" data-mob="stroller"   onclick="selMob(this)"><span class="ic">🍼</span>Carriola</button>
       <button class="mob-btn mob-full" data-mob="none" onclick="selMob(this)"><span class="ic">🚶</span>Sin restricciones</button>
+    </div>
+
+    <!-- Solo visible cuando mobility = elderly -->
+    <div id="row-am" class="field" style="display:none;margin-top:12px">
+      <label>Condición principal (adulto mayor)</label>
+      <select id="p-cond-am">
+        <option value="">— Selecciona —</option>
+        <option value="artritis">Artritis / reumatismo</option>
+        <option value="osteoporosis">Osteoporosis</option>
+        <option value="vision_reducida">Visión reducida</option>
+        <option value="audicion_reducida">Audición reducida</option>
+        <option value="diabetes">Diabetes</option>
+        <option value="equilibrio">Problemas de equilibrio</option>
+        <option value="demencia_leve">Demencia leve</option>
+        <option value="otra">Otra</option>
+      </select>
     </div>
 
     <button class="btn btn-primary" style="margin-top:16px" onclick="saveProfile()">Guardar y continuar</button>
@@ -297,6 +282,8 @@ input:focus { outline:none; border-color:var(--brand); }
 
 <div id="toast"></div>
 
+<!-- Config local (gitignored) — define window.PASO_CONFIG -->
+<script src="./config.js"></script>
 <!-- Supabase UMD: carga síncrona, expone window.supabase antes del siguiente script -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
@@ -307,13 +294,12 @@ window.onerror = function(msg, src, line) {
 
 const { createClient } = supabase;
 
-// ── Config — se hidrata desde /config (Cloud Function lee .env) ──────────────
-// XXX GEMINI_API_KEY sigue inline: el browser llama a Gemini directo en gemini().
-// Mover esa llamada a /reports/submit (Cloud Function) y quitar este const.
-let   SUPABASE_URL        = '';
-let   SUPABASE_ANON_KEY   = '';
-let   GOOGLE_MAPS_API_KEY = '';
-const GEMINI_API_KEY      = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
+// ── Config — desde window.PASO_CONFIG (public/config.js, gitignored) ─────────
+const _cfg = window.PASO_CONFIG || {};
+const SUPABASE_URL        = _cfg.SUPABASE_URL        || '';
+const SUPABASE_ANON_KEY   = _cfg.SUPABASE_ANON_KEY   || '';
+const GOOGLE_MAPS_API_KEY = _cfg.GOOGLE_MAPS_API_KEY || '';
+const GEMINI_API_KEY      = _cfg.GEMINI_API_KEY      || '';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TJ = { latMin:32.4, latMax:32.7, lngMin:-117.2, lngMax:-116.8 };
@@ -336,27 +322,12 @@ function showJsError(msg) {
   console.error(msg);
 }
 
-// Las Cloud Functions se sirven en mismo origen vía Hosting rewrites (firebase.json).
-// Sirve igual en :5000 (emulator) y en producción.
-async function loadConfig() {
-  const res = await fetch('/config');
-  if (!res.ok) throw new Error('/config ' + res.status);
-  const c = await res.json();
-  SUPABASE_URL        = c.supabaseUrl        || '';
-  SUPABASE_ANON_KEY   = c.supabaseAnonKey    || '';
-  GOOGLE_MAPS_API_KEY = c.mapsApiKey         || '';
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !GOOGLE_MAPS_API_KEY) {
-    throw new Error('faltan keys en /config — revisa SUPABASE_URL, SUPABASE_ANON_KEY y GOOGLE_MAPS_API_KEY en backend/functions/.env');
-  }
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !GOOGLE_MAPS_API_KEY) {
+  showJsError('Faltan keys en public/config.js — copia config.example.js a config.js y rellena SUPABASE_URL, SUPABASE_ANON_KEY y GOOGLE_MAPS_API_KEY.');
 }
 
 (async () => {
-  try {
-    await loadConfig();
-  } catch(e) {
-    showJsError('No se pudo cargar /config: ' + e.message);
-    return;
-  }
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
   try {
     sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true } });
   } catch(e) {
@@ -427,61 +398,57 @@ function authErr(m){document.getElementById('auth-error').textContent=m;}
 // ── Profile ──────────────────────────────────────────────────────────────────
 async function loadProfile(uid){
   const{data}=await sb.from('user_profiles')
-    .select('mobility_type,nombre,telefono,tipo_discapacidad,condicion_adulto_mayor,telefono_emergencia')
+    .select('mobility_type,nombre,telefono,condicion_adulto_mayor,telefono_emergencia')
     .eq('uid',uid).maybeSingle();
   if(data){
     selMobility=data.mobility_type||'none';
     const s=document.getElementById('r-profile'); if(s) s.value=selMobility;
-    // Rellenar campos del formulario de perfil si existen
+    // Marcar el botón de movilidad activo
+    document.querySelectorAll('.mob-btn').forEach(b=>{
+      b.classList.toggle('sel', b.dataset.mob===selMobility);
+    });
     const fill=(id,val)=>{const e=document.getElementById(id);if(e&&val)e.value=val;};
-    fill('p-nombre', data.nombre);
-    fill('p-tel',    data.telefono);
-    fill('p-discap', data.tipo_discapacidad);
-    fill('p-cond-am',data.condicion_adulto_mayor);
-    fill('p-tel-em', data.telefono_emergencia);
-    if(data.tipo_discapacidad==='adulto_mayor'){
-      const row=document.getElementById('row-am'); if(row) row.style.display='';
-    }
+    fill('p-nombre',  data.nombre);
+    fill('p-tel',     data.telefono);
+    fill('p-cond-am', data.condicion_adulto_mayor);
+    fill('p-tel-em',  data.telefono_emergencia);
+    // Mostrar condición adulto mayor solo si mobility = elderly
+    const row=document.getElementById('row-am');
+    if(row) row.style.display = selMobility==='elderly' ? '' : 'none';
   }
   return !!data;
 }
-
-// Mostrar/ocultar campo secundario de adulto mayor
-window.onDiscapChange = () => {
-  const val = document.getElementById('p-discap').value;
-  const row = document.getElementById('row-am');
-  row.style.display = val==='adulto_mayor' ? '' : 'none';
-  if(val!=='adulto_mayor') document.getElementById('p-cond-am').value='';
-};
 
 window.selMob = (btn) => {
   document.querySelectorAll('.mob-btn').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel');
   selMobility=btn.dataset.mob;
-  // Sincronizar automáticamente: si eligen adulto mayor en el grid, setear discapacidad
-  if(btn.dataset.mob==='elderly'){
-    const d=document.getElementById('p-discap');
-    if(d&&!d.value) d.value='adulto_mayor';
-    window.onDiscapChange();
+  // Mostrar/ocultar condición adulto mayor según selección
+  const row=document.getElementById('row-am');
+  if(row){
+    if(selMobility==='elderly'){
+      row.style.display='';
+    } else {
+      row.style.display='none';
+      const am=document.getElementById('p-cond-am'); if(am) am.value='';
+    }
   }
 };
 
 window.saveProfile = async () => {
   if(!selMobility){toast('Selecciona cómo te desplazas');return;}
-  const nombre   = v('p-nombre').trim();
-  const tel      = v('p-tel').trim();
-  const discap   = v('p-discap');
-  const condAM   = v('p-cond-am') || null;
-  const telEm    = v('p-tel-em').trim();
+  const nombre = v('p-nombre').trim();
+  const tel    = v('p-tel').trim();
+  const condAM = selMobility==='elderly' ? (v('p-cond-am') || null) : null;
+  const telEm  = v('p-tel-em').trim();
 
   const row = {
     uid: session.user.id,
-    mobility_type: selMobility,
-    nombre:                nombre   || null,
-    telefono:              tel      || null,
-    tipo_discapacidad:     discap   || null,
-    condicion_adulto_mayor:discap==='adulto_mayor' ? condAM : null,
-    telefono_emergencia:   telEm    || null,
+    mobility_type:          selMobility,
+    nombre:                 nombre || null,
+    telefono:               tel    || null,
+    condicion_adulto_mayor: condAM,
+    telefono_emergencia:    telEm  || null,
   };
 
   const{error}=await sb.from('user_profiles').upsert(row,{onConflict:'uid'});

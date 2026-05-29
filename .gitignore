@@ -1,7 +1,5 @@
 # Credenciales — NUNCA commitear
-backend/serviceAccountKey.json
 backend/.env
-backend/functions/.env
 backend/public/config.js
 **/.env
 **/.env.local
@@ -15,14 +13,6 @@ node_modules/
 
 # Fotos de campo (pesadas)
 backend/seed/fotos/
-
-# Firebase emulator
-.firebase/
-firebase-debug.log
-firestore-debug.log
-database-debug.log
-ui-debug.log
-storage-debug.log
 
 # Logs
 *.log

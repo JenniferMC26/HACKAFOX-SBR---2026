@@ -1,63 +1,43 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Paso — docker-compose.yml
 #
-# Define dos servicios:
-#   emulator  → Firebase Emulator Suite (Functions + Hosting locales)
-#   seed      → Runner para los scripts de seed (Supabase, BigQuery)
+# Dos servicios:
+#   web   → nginx que sirve public/ (test console) en http://localhost:5000
+#   seed  → runner Node.js para los scripts de seed contra Supabase
 #
-# Supabase corre en la nube — todas las conexiones de DB/Storage/Auth salen del
-# contenedor a internet usando las credenciales del .env.
+# Supabase corre en la nube — toda la lógica (auth, DB, storage, realtime) sale
+# del browser directo al proyecto Supabase usando las claves de public/config.js.
+# Las claves de servidor (SUPABASE_SERVICE_KEY, etc.) solo las usa el runner de
+# seed y vienen del .env.
 #
 # Comandos frecuentes:
-#   docker compose up               → levantar el emulador
-#   docker compose up --build       → reconstruir imagen y levantar
-#   docker compose run --rm seed node seed/supabase-seed.js
-#   docker compose run --rm seed node seed/users-seed.js
-#   docker compose run --rm seed python3 seed/bigquery_seed.py
-#   docker compose down             → apagar todo
+#   docker compose up -d                                         → levantar web
+#   docker compose down                                          → apagar
+#   docker compose run --rm seed node seed/supabase-seed.js      → seed nodos
+#   docker compose run --rm seed node seed/users-seed.js         → seed usuarios
 # ─────────────────────────────────────────────────────────────────────────────
 
-x-env: &shared-env
-  SUPABASE_URL: ${SUPABASE_URL}
-  SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-  SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
-  GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-paso}
-  SKIP_AUTH: ${SKIP_AUTH:-false}
-
 services:
-  emulator:
-    build: .
-    container_name: paso_emulator
+  web:
+    image: nginx:alpine
+    container_name: paso_web
     ports:
-      - "4000:4000"   # Emulator UI  → http://localhost:4000
-      - "5000:5000"   # Hosting      → http://localhost:5000  (test console)
-      - "5001:5001"   # Functions    → http://localhost:5001/paso/us-central1/<fn>
+      - "5000:80"
     volumes:
-      - .:/app
-      - node_modules_cache:/app/node_modules
-      - functions_node_modules_cache:/app/functions/node_modules
-    environment:
-      <<: *shared-env
-      FUNCTIONS_EMULATOR: "true"
-    env_file:
-      - .env
+      - ./public:/usr/share/nginx/html:ro
+    restart: unless-stopped
 
   seed:
     build: .
     container_name: paso_seed
+    working_dir: /app
     volumes:
       - .:/app
-      - node_modules_cache:/app/node_modules
-      - functions_node_modules_cache:/app/functions/node_modules
-    environment:
-      <<: *shared-env
+      - seed_node_modules:/app/node_modules
     env_file:
       - .env
     entrypoint: []
-    command: ["echo", "Usa: docker compose run --rm seed <comando>"]
+    command: ["echo", "Uso: docker compose run --rm seed node seed/<script>.js"]
 
 volumes:
-  node_modules_cache:
-  functions_node_modules_cache:
+  seed_node_modules:
