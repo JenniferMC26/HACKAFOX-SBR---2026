@@ -211,7 +211,8 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- 3.3 Upsert atómico: si hay nodo a < radio, lo actualiza; si no, crea uno nuevo.
--- Evita el race del find-then-insert separado.
+-- SECURITY DEFINER: el browser (anon/authenticated) puede escribir en accessibility_nodes
+-- aunque la política RLS solo permita service_role. Seguro porque valida ownership vía JWT.
 CREATE OR REPLACE FUNCTION public.upsert_node_near(
   p_lat            FLOAT8,
   p_lng            FLOAT8,
@@ -224,7 +225,7 @@ CREATE OR REPLACE FUNCTION public.upsert_node_near(
   p_gemini_analysis JSONB,
   p_source         TEXT DEFAULT 'field_verified'
 ) RETURNS public.accessibility_nodes
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   existing_id TEXT;
   result      public.accessibility_nodes;
@@ -266,10 +267,11 @@ END;
 $$;
 
 -- 3.4 Reportes recientes en un radio (para Ruta Viva).
+-- SECURITY DEFINER: necesita leer todos los reports, no solo los del usuario actual.
 CREATE OR REPLACE FUNCTION public.recent_reports_near(
   p_lat FLOAT8, p_lng FLOAT8, p_radius_m FLOAT8, p_window_seconds INT
 ) RETURNS TABLE(gemini_analysis JSONB, created_at TIMESTAMPTZ)
-LANGUAGE sql STABLE AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT r.gemini_analysis, r.created_at
   FROM public.reports r
   WHERE r.created_at >= NOW() - (p_window_seconds || ' seconds')::interval
@@ -277,9 +279,10 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- 3.5 Siguiente ticket ID atómico (PASO-YYYY-NNNN).
+-- SECURITY DEFINER: el browser no tiene USAGE en ticket_seq por defecto.
 CREATE OR REPLACE FUNCTION public.next_ticket_id()
 RETURNS TEXT
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   seq_val BIGINT;
   yr      INT;
@@ -426,3 +429,75 @@ CREATE POLICY "reports_read_auth" ON storage.objects
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.crisis_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 7. Browser-direct patch — habilita el SPA para operar sin Firebase Functions
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- 7.1 RPC que inserta accessibility_reports + civic_tickets (fire-and-forget
+--     del browser tras un reporte). SECURITY DEFINER porque ambas tablas solo
+--     permiten escritura a service_role en sus políticas RLS.
+CREATE OR REPLACE FUNCTION public.submit_report_background(
+  p_report_id          TEXT,
+  p_uid                TEXT,
+  p_lat                FLOAT8,
+  p_lng                FLOAT8,
+  p_barrier_type       TEXT,
+  p_severity           INT,
+  p_hour               INT,
+  p_dow                INT,
+  p_weather            TEXT DEFAULT NULL,
+  p_reported_at        TIMESTAMPTZ DEFAULT NOW(),
+  p_ticket_id          TEXT DEFAULT NULL,
+  p_photo_url          TEXT DEFAULT NULL,
+  p_gemini_description TEXT DEFAULT NULL,
+  p_affected_users     INT DEFAULT 0
+) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.accessibility_reports (
+    report_id, user_id, lat, lng, barrier_type, severity,
+    hour_of_day, day_of_week, weather_condition, reported_at
+  ) VALUES (
+    p_report_id, p_uid, p_lat, p_lng, p_barrier_type, p_severity,
+    p_hour, p_dow, p_weather, p_reported_at
+  );
+
+  IF p_ticket_id IS NOT NULL THEN
+    INSERT INTO public.civic_tickets (
+      ticket_id, report_id, lat, lng, barrier_type, severity,
+      photo_url, gemini_description, affected_users_estimate, status
+    ) VALUES (
+      p_ticket_id, p_report_id, p_lat, p_lng, p_barrier_type, p_severity,
+      p_photo_url, p_gemini_description, p_affected_users, 'open'
+    );
+  END IF;
+END;
+$$;
+
+-- 7.2 Políticas de crisis_sessions para usuarios autenticados (antes solo service_role).
+DROP POLICY IF EXISTS "crisis_own_insert" ON public.crisis_sessions;
+CREATE POLICY "crisis_own_insert" ON public.crisis_sessions
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid()::text = user_id);
+
+DROP POLICY IF EXISTS "crisis_own_update" ON public.crisis_sessions;
+CREATE POLICY "crisis_own_update" ON public.crisis_sessions
+  FOR UPDATE TO authenticated
+  USING (auth.uid()::text = user_id);
+
+-- 7.3 Política de notificaciones — el usuario puede insertar sus propias alertas.
+DROP POLICY IF EXISTS "notif_own_insert" ON public.notifications;
+CREATE POLICY "notif_own_insert" ON public.notifications
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid()::text = from_user_id);
+
+-- 7.4 GRANT EXECUTE en todas las RPCs para roles anon y authenticated.
+GRANT EXECUTE ON FUNCTION public.nodes_in_bbox          TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.nearest_node           TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.upsert_node_near       TO authenticated;
+GRANT EXECUTE ON FUNCTION public.recent_reports_near    TO authenticated;
+GRANT EXECUTE ON FUNCTION public.next_ticket_id         TO authenticated;
+GRANT EXECUTE ON FUNCTION public.ruta_viva_history      TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.submit_report_background TO authenticated;
