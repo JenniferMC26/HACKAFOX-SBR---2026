@@ -49,10 +49,15 @@ class _OnboardingMobilityScreenState extends State<OnboardingMobilityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SafeArea(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // SECCIÓN: Indicador de progreso
@@ -292,6 +297,9 @@ class _OnboardingMobilityScreenState extends State<OnboardingMobilityScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
           ),
         ),
       ),

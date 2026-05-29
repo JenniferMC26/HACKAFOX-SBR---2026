@@ -53,10 +53,15 @@ class _OnboardingEmergencyScreenState
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SafeArea(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // SECCIÓN: Indicador de progreso
@@ -278,6 +283,9 @@ class _OnboardingEmergencyScreenState
                 ],
               ),
             ],
+          ),
+        ),
+      ),
           ),
         ),
       ),
