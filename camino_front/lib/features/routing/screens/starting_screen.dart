@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'route_details_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 
@@ -11,6 +12,10 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final TextEditingController _searchController = TextEditingController();
+  static const _initialPosition = CameraPosition(
+    target: LatLng(32.5149, -117.0382),
+    zoom: 14.0,
+  );
 
   @override
   void dispose() {
@@ -24,32 +29,13 @@ class _MapScreenState extends State<MapScreen> {
       body: Stack(
         children: [
           // Map Background
-          // MODIFICACIÓN: Se cambió el ícono a Icons.map_rounded y el texto a "Cargando mapa de Tijuana...".
-          // Se ajustó el color a #9AA0A6 para cumplir con las directrices visuales.
-          Container(
-            color: const Color(0xFFF1F3F4),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.map_rounded,
-                    size: 80,
-                    color: const Color(0xFF9AA0A6).withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Cargando mapa de Tijuana...',
-                    style: TextStyle(
-                      color: Color(0xFF9AA0A6),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
           ),
 
           // Floating Input Field
