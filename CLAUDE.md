@@ -14,7 +14,6 @@ Frontend final: Flutter (fuera del alcance de este plan).
 | Base de datos principal | Supabase PostgreSQL + PostGIS |
 | Autenticación | Supabase Auth (proveedor anónimo) |
 | Almacenamiento de fotos | Supabase Storage |
-| Analítica e historial | Google BigQuery |
 | Análisis de imágenes | Gemini Vision API (`gemini-2.5-flash`) |
 | Ruteo y mapas | Google Maps Routes API + Places API |
 | Frontend de prueba | HTML plano + Supabase JS SDK v2 + Google Maps JS API |
@@ -55,10 +54,9 @@ Paso/                               # Raíz del proyecto (repo)
     │   ├── index.js                    # Registro de Cloud Functions + CORS
     │   └── package.json
     ├── seed/
-    │   ├── supabase-seed.js            # Inserta nodos estimados en Supabase
+    │   ├── supabase-seed.js            # Inserta nodos estimados + patrones temporales en Supabase
     │   ├── users-seed.js               # Inserta usuarios de prueba en Supabase Auth
     │   ├── upload-field-photos.js      # Sube fotos a Supabase Storage y verifica nodos
-    │   ├── bigquery_seed.py            # Inserta temporal_patterns en BigQuery (sin cambios)
     │   ├── supabase-schema.sql         # DDL completo de tablas Supabase + RLS
     │   ├── estimated-nodes.json        # Data de los 14 nodos estimados
     │   └── field-captures.json         # Nodos a verificar en campo (6 prioritarios)
@@ -79,8 +77,7 @@ Paso/                               # Raíz del proyecto (repo)
 ```bash
 # Google APIs
 GEMINI_API_KEY=...
-GOOGLE_MAPS_API_KEY=...           # Habilitar: Routes API, Places API
-GOOGLE_CLOUD_PROJECT=paso
+GOOGLE_MAPS_API_KEY=...           # Maps JS API (mapa visual) — Routes API si se consigue
 
 # Supabase (obtener en supabase.com → proyecto → Settings → API)
 SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
@@ -160,27 +157,54 @@ CREATE TABLE public.user_profiles (
   created_at           TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Secuencia atómica para ticket IDs (reemplaza /counters/ticketSeq de RTDB)
+-- Tabla 5: historial de reportes (reemplaza BigQuery accessibility_reports)
+CREATE TABLE public.accessibility_reports (
+  id                TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  report_id         TEXT NOT NULL,
+  user_id           TEXT NOT NULL,
+  lat               FLOAT8 NOT NULL,
+  lng               FLOAT8 NOT NULL,
+  location          GEOGRAPHY(POINT, 4326),
+  barrier_type      TEXT,
+  severity          INT,
+  hour_of_day       INT,                -- 0–23
+  day_of_week       INT,                -- 0=lunes … 6=domingo
+  reported_at       TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at       TIMESTAMPTZ
+);
+
+-- Tabla 6: patrones temporales para Ruta Viva (reemplaza BigQuery temporal_patterns)
+CREATE TABLE public.temporal_patterns (
+  id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  lat                 FLOAT8 NOT NULL,
+  lng                 FLOAT8 NOT NULL,
+  location            GEOGRAPHY(POINT, 4326),
+  hour_of_day         INT NOT NULL,     -- 0–23
+  day_of_week         INT NOT NULL,     -- 0=lunes … 6=domingo
+  accessibility_score FLOAT8 NOT NULL,  -- 0.0 inaccesible → 1.0 accesible
+  event_flag          BOOLEAN DEFAULT FALSE,
+  report_count        INT DEFAULT 0
+);
+
+-- Tabla 7: tickets formales para municipio (reemplaza BigQuery civic_tickets)
+CREATE TABLE public.civic_tickets (
+  id                      TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  ticket_id               TEXT NOT NULL UNIQUE,  -- PASO-YYYY-NNNN
+  report_id               TEXT NOT NULL,
+  lat                     FLOAT8 NOT NULL,
+  lng                     FLOAT8 NOT NULL,
+  barrier_type            TEXT,
+  severity                INT,
+  photo_url               TEXT,
+  gemini_description      TEXT,
+  affected_users_estimate INT,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  assigned_to             TEXT,
+  status                  TEXT DEFAULT 'open' CHECK (status IN ('open','assigned','resolved'))
+);
+
+-- Secuencia atómica para ticket IDs
 CREATE SEQUENCE public.ticket_seq START 1;
-```
-
----
-
-## Tablas BigQuery (`dataset: paso`) — sin cambios
-
-```sql
--- accessibility_reports: espejo histórico de reportes ciudadanos
-report_id, user_id, lat, lng, barrier_type, severity,
-hour_of_day, day_of_week, weather_condition, reported_at, resolved_at
-
--- temporal_patterns: seed para Ruta Viva (predicción temporal)
-lat, lng, hour_of_day (0-23), day_of_week (0=lunes),
-accessibility_score (0.0-1.0), event_flag, report_count
-
--- civic_tickets: tickets formales para municipio (severity >= 7)
-ticket_id (PASO-YYYY-NNNN), report_id, lat, lng,
-barrier_type, severity, photo_url, gemini_description,
-affected_users_estimate, created_at, assigned_to, status
 ```
 
 ---
@@ -266,20 +290,17 @@ if (location.hostname === 'localhost') {
 #    - Ir al SQL Editor → pegar y correr backend/seed/supabase-schema.sql
 #    - En Authentication → Providers → activar "Anonymous sign-ins"
 #    - En Storage → crear bucket "reports" (público: false)
+#    - En Database → Replication → activar tabla crisis_sessions
 
-# 2. Habilitar APIs en Google Cloud Console
-#    - Routes API, Places API (New), Maps JavaScript API
-#    - Gemini API (via AI Studio)
+# 2. Obtener Gemini API key
+#    - Ir a aistudio.google.com/app/apikey → crear key gratis
 
-# 3. Crear dataset y tablas en BigQuery
-#    Correr backend/seed/queries.sql (Parte A) desde la consola de BQ
-
-# 4. Inicializar Firebase Cloud Functions dentro de backend/
+# 3. Inicializar Firebase Cloud Functions dentro de backend/
 cd backend/
 firebase init functions   # Node.js 20, JavaScript
-npm install --save @google-cloud/bigquery @google/generative-ai cors @supabase/supabase-js
+npm install --save @google/generative-ai cors @supabase/supabase-js
 
-# 5. Construir el contenedor Docker
+# 4. Construir el contenedor Docker
 docker compose build
 ```
 
@@ -291,13 +312,12 @@ docker compose build
 
 ```bash
 cd backend/
-docker compose run --rm seed node seed/supabase-seed.js
+docker compose run --rm seed node seed/supabase-seed.js   # nodos + patrones temporales
 docker compose run --rm seed node seed/users-seed.js
-docker compose run --rm seed python3 seed/bigquery_seed.py
 ```
 
 **Verificación**: Supabase Dashboard → Table Editor → `accessibility_nodes` debe tener
-~14 nodos y `user_profiles` los 3 usuarios de prueba.
+~14 nodos, `temporal_patterns` ~26 filas, y `user_profiles` los 3 usuarios de prueba.
 
 ---
 
@@ -343,9 +363,9 @@ Lógica:
    WHERE ST_DWithin(location, ST_Point($lng,$lat)::geography, 30)
    ORDER BY location <-> ST_Point($lng,$lat)::geography LIMIT 1
    ```
-7. Escribir en BigQuery `accessibility_reports` (fire and forget)
+7. Insertar en `accessibility_reports` de Supabase (fire and forget)
 8. Si `severity >= 7` → obtener ticket ID atómico con `SELECT nextval('ticket_seq')`,
-   formatear como `PASO-YYYY-NNNN`, insertar en BigQuery `civic_tickets`
+   formatear como `PASO-YYYY-NNNN`, insertar en `civic_tickets` de Supabase
 
 ```bash
 firebase deploy --only functions:reportSubmit
@@ -359,17 +379,19 @@ firebase deploy --only functions:reportSubmit
 
 Archivo: `backend/functions/src/ruta-viva/prediction.js`
 
-**Sin cambios respecto al diseño original** — usa BigQuery exclusivamente.
-El 30% de datos recientes ahora se consulta desde Supabase `reports` en lugar de RTDB:
-
-```js
-// Reemplazar la consulta de Firebase reciente por:
-const { data } = await supabase
-  .from('reports')
-  .select('gemini_analysis')
-  .gte('created_at', new Date(Date.now() - 2*60*60*1000).toISOString())
-  .filter('location', 'st_dwithin', `POINT(${lng} ${lat}),200`);
-```
+Todo corre sobre Supabase — sin BigQuery. Lógica:
+1. Extraer `hour_of_day` y `day_of_week` del `arrivalTime` ISO 8601
+2. Query a `temporal_patterns` en Supabase con PostGIS radio ~200m:
+   ```sql
+   SELECT accessibility_score, event_flag, report_count
+   FROM temporal_patterns
+   WHERE hour_of_day = $hour AND day_of_week = $dow
+   AND ST_DWithin(location, ST_Point($lng,$lat)::geography, 200)
+   ```
+3. Si `data.length < 3` → fallback con `applied: false`
+4. Combinar 70% histórico (`temporal_patterns`) + 30% reportes recientes
+   de `accessibility_reports` (últimas 2h, radio 200m)
+5. Cache en memoria con TTL 30 min por `(lat_rounded, lng_rounded, hour, dow)`
 
 ```bash
 firebase deploy --only functions:rutaVivaScore
@@ -449,19 +471,18 @@ Solo tiene `SUPABASE_ANON_KEY` y la Maps JS API key (restringida por dominio).
 ## Módulos compartidos (`src/shared/`)
 
 ### `clients.js`
-Inicializa el cliente Supabase (service role) y BigQuery una sola vez.
+Inicializa el cliente Supabase (service role) una sola vez y lo exporta.
+Todos los módulos importan de aquí — nunca crean su propio cliente.
 
 ```js
 const { createClient } = require('@supabase/supabase-js');
-const { BigQuery } = require('@google-cloud/bigquery');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 );
-const bigquery = new BigQuery({ projectId: process.env.GOOGLE_CLOUD_PROJECT });
 
-module.exports = { supabase, bigquery };
+module.exports = { supabase };
 ```
 
 ### `nodeUtils.js`
@@ -478,7 +499,7 @@ Valores de negocio centralizados:
 - `THRESHOLDS = { wheelchair: 6, elderly: 4, standard: 3 }`
 - `RUTA_VIVA_CACHE_TTL_MS = 30 * 60 * 1000`
 - `REPORT_NEARBY_RADIUS_METERS = 30`
-- `RUTA_VIVA_BQ_WEIGHT = 0.7`, `RUTA_VIVA_SUPABASE_WEIGHT = 0.3`
+- `RUTA_VIVA_HISTORICAL_WEIGHT = 0.7`, `RUTA_VIVA_RECENT_WEIGHT = 0.3`
 
 ---
 
@@ -601,6 +622,7 @@ if (!session || session.user_id !== uid) {
 
 - [ ] RLS habilitado en todas las tablas (verificar en Supabase → Authentication → Policies)
 - [ ] Storage policies aplicadas en bucket `reports`
+- [ ] Supabase Realtime activo en tabla `crisis_sessions`
 - [ ] `SUPABASE_SERVICE_KEY` y `.env` fuera del repo (`git status`)
 - [ ] `SUPABASE_ANON_KEY` en el frontend — confirmar que NO es `service_role`
 - [ ] Maps JS API key restringida por dominio en Google Cloud Console
@@ -613,12 +635,11 @@ if (!session || session.user_id !== uid) {
 ## Notas generales
 
 - **CORS**: siempre aplicar `cors({ origin: true })` en todas las Cloud Functions
-- **Fire and forget**: las escrituras en BigQuery no bloquean la respuesta al cliente
+- **Fire and forget**: inserciones en `accessibility_reports` y `civic_tickets` no bloquean la respuesta al cliente
 - **Foto en Storage primero**: el cliente sube la foto a Supabase Storage y envía solo la URL
 - **Score vs Severity**: `severityToScore()` en `shared/constants.js`. Score alto = más accesible.
 - **PostGIS vs geohash**: no usar `ngeohash`. Toda búsqueda geoespacial usa `ST_DWithin` / `ST_Within`
 - **Timezone**: el cliente envía ISO 8601 con offset explícito (`2026-05-28T10:00:00-07:00`)
-- **BigQuery latencia**: 1-3s por query. Usar el cache de Ruta Viva siempre.
 - **`conversation.js` llama `routing.js` por import directo**, no por HTTP
 - **Auth**: el cliente llama `supabase.auth.signInAnonymously()` al cargar; adjunta el JWT en
   cada request como `Authorization: Bearer <token>`. Las Cloud Functions verifican con
