@@ -113,10 +113,30 @@ async function nextTicketId() {
   return data;
 }
 
+// Score histórico promedio para Ruta Viva. Devuelve null si no hay datos.
+async function rutaVivaHistory(lat, lng, hour, dow, radiusMeters = 200) {
+  const { data, error } = await supabase.rpc('ruta_viva_history', {
+    p_lat: lat,
+    p_lng: lng,
+    p_hour: hour,
+    p_dow: dow,
+    p_radius_m: radiusMeters,
+  });
+  if (error) throw new Error(`ruta_viva_history: ${error.message}`);
+  const row = data && data[0];
+  if (!row || row.data_points == null) return { avgScore: null, dataPoints: 0, hasEvent: false };
+  return {
+    avgScore: row.avg_score == null ? null : Number(row.avg_score),
+    dataPoints: Number(row.data_points || 0),
+    hasEvent: !!row.has_event,
+  };
+}
+
 module.exports = {
   findNodesInBoundingBox,
   findNearestNode,
   upsertNodeNear,
   recentReportsNear,
   nextTicketId,
+  rutaVivaHistory,
 };

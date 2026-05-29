@@ -29,9 +29,10 @@ const THRESHOLDS = {
 // Cache en memoria de Ruta Viva.
 const RUTA_VIVA_CACHE_TTL_MS = 30 * 60 * 1000;
 
-// Pesos al combinar histórico (BigQuery) con tiempo real (Supabase).
-const RUTA_VIVA_BQ_WEIGHT = 0.7;
-const RUTA_VIVA_SUPABASE_WEIGHT = 0.3;
+// Pesos al combinar histórico (temporal_patterns) con tiempo real (reports
+// recientes). Ambos viven en Supabase.
+const RUTA_VIVA_HISTORY_WEIGHT = 0.7;
+const RUTA_VIVA_REALTIME_WEIGHT = 0.3;
 const RUTA_VIVA_MIN_DATA_POINTS = 3;
 
 // Radio para considerar que un reporte aplica a un nodo existente.
@@ -51,8 +52,8 @@ module.exports = {
   severityToScore,
   THRESHOLDS,
   RUTA_VIVA_CACHE_TTL_MS,
-  RUTA_VIVA_BQ_WEIGHT,
-  RUTA_VIVA_SUPABASE_WEIGHT,
+  RUTA_VIVA_HISTORY_WEIGHT,
+  RUTA_VIVA_REALTIME_WEIGHT,
   RUTA_VIVA_MIN_DATA_POINTS,
   REPORT_NEARBY_RADIUS_METERS,
   GEMINI_MIN_CONFIDENCE,
