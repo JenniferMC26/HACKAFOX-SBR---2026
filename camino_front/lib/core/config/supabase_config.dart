@@ -15,8 +15,8 @@ class SupabaseConfig {
   static const supabaseAnonKey =
       'PON TU API KEY AQUI';
 
-  // Gemini API — Google AI Studio → API Keys
-  static const geminiApiKey = 'PON TU API KEY AQUI';
+  // Groq API — Groq Cloud → API Keys
+  static const groqApiKey = 'PON TU API KEY AQUI';
 
   // Google Maps — Google Cloud Console → APIs & Services → Credentials
   static const googleMapsApiKey = 'PON TU API KEY AQUI';

@@ -21,8 +21,10 @@ class CrisisService {
   static String? get activeSessionId => _activeSessionId;
 
   /// Inicia una sesion de crisis.
-  /// Retorna el ID de la sesion creada.
-  static Future<String> startCrisis({
+  /// Retorna un mapa con:
+  ///   - 'sessionId': ID de la sesion creada
+  ///   - 'contactName': nombre del primer contacto de emergencia alertado
+  static Future<Map<String, dynamic>> startCrisis({
     required double lat,
     required double lng,
   }) async {
@@ -52,7 +54,29 @@ class CrisisService {
     // Notificar al contacto de emergencia real del perfil.
     await _notifyEmergencyContact(lat: lat, lng: lng, profile: profile);
 
-    return _activeSessionId!;
+    // Resolver el nombre del primer contacto alertado para mostrarlo en UI.
+    String contactName = 'Contacto de emergencia';
+    final rawContacts =
+        profile?['emergency_contacts'] as List<dynamic>? ?? [];
+    if (rawContacts.isNotEmpty) {
+      final first = Map<String, dynamic>.from(rawContacts.first as Map);
+      contactName = (first['nombre'] as String?)?.isNotEmpty == true
+          ? first['nombre'] as String
+          : 'Contacto de emergencia';
+    } else {
+      // Fallback: usar nombre del perfil si hay telefono_emergencia
+      final phone = profile?['telefono_emergencia'] as String?;
+      if (phone != null && phone.isNotEmpty) {
+        contactName = (profile?['nombre'] as String?)?.isNotEmpty == true
+            ? profile!['nombre'] as String
+            : 'Contacto de emergencia';
+      }
+    }
+
+    return {
+      'sessionId': _activeSessionId!,
+      'contactName': contactName,
+    };
   }
 
   /// Suscribirse a cambios en la sesion de crisis (nearest_safe_point).
