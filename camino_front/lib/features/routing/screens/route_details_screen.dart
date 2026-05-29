@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:camino_front/features/routing/screens/navigation_screen.dart';
 
 class RouteDetailsScreen extends StatefulWidget {
-  const RouteDetailsScreen({super.key});
+  const RouteDetailsScreen({
+    super.key,
+    this.destination = 'IMSS Clínica 1 — Tijuana',
+  });
+
+  final String destination;
 
   @override
   State<RouteDetailsScreen> createState() => _RouteDetailsScreenState();
@@ -23,7 +28,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     setState(() {
-      _foundLocation = "IMSS Clínica 1 — Tijuana";
+      _foundLocation = widget.destination;
       _isLoading = false;
     });
   }
@@ -253,7 +258,9 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                     ),
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const NavigationScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => NavigationScreen(destination: _foundLocation),
+                      ),
                     ),
                     child: const Text(
                       'Iniciar navegación',
