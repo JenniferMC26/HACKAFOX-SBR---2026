@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:camino_front/features/routing/screens/starting_screen.dart';
+import 'package:camino_front/features/auth/screens/onboarding_mobility_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,10 +24,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.pushAndRemoveUntil(
+    Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const MapScreen()),
-      (route) => false,
+      MaterialPageRoute(builder: (_) => const OnboardingMobilityScreen()),
     );
   }
 
@@ -57,271 +56,279 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // SECCIÓN: Header
-              const Text(
-                '¡Bienvenido a VíaLibre TJ!',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Crea tu cuenta para empezar a navegar de forma segura.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // SECCIÓN: Formulario
-              Form(
-                key: _formKey,
+      body: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Campo nombre completo
-                    TextFormField(
-                      controller: _nameController,
-                      keyboardType: TextInputType.name,
-                      textCapitalization: TextCapitalization.words,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    // SECCIÓN: Header
+                    const Text(
+                      '¡Bienvenido a PASO!',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
                       ),
-                      decoration: InputDecoration(
-                        labelText: 'Nombre completo',
-                        hintText: 'Ej. María López García',
-                        prefixIcon: const Icon(
-                          Icons.person_rounded,
-                          color: Color(0xFF4285F4),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF4285F4),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8F9FA),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Ingresa tu nombre completo';
-                        }
-                        if (v.trim().split(' ').length < 2) {
-                          return 'Ingresa nombre y apellido';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 16),
-
-                    // Campo teléfono
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Crea tu cuenta para empezar a navegar de forma segura.',
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                        height: 1.5,
                       ),
-                      decoration: InputDecoration(
-                        labelText: 'Número de teléfono',
-                        hintText: '10 dígitos',
-                        prefixIcon: const Icon(
-                          Icons.phone_rounded,
-                          color: Color(0xFF4285F4),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF4285F4),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8F9FA),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Ingresa tu número de teléfono';
-                        }
-                        if (v.length < 10) {
-                          return 'El número debe tener 10 dígitos';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Campo contraseña
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Contraseña',
-                        hintText: 'Mínimo 6 caracteres',
-                        prefixIcon: const Icon(
-                          Icons.lock_rounded,
-                          color: Color(0xFF4285F4),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: const Color(0xFF9AA0A6),
-                          ),
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF4285F4),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8F9FA),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Ingresa una contraseña';
-                        }
-                        if (v.length < 6) return 'Mínimo 6 caracteres';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Campo confirmar contraseña
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirm,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Confirmar contraseña',
-                        prefixIcon: const Icon(
-                          Icons.lock_outline_rounded,
-                          color: Color(0xFF4285F4),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirm
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: const Color(0xFF9AA0A6),
-                          ),
-                          onPressed: () => setState(
-                            () => _obscureConfirm = !_obscureConfirm,
-                          ),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF4285F4),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8F9FA),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Confirma tu contraseña';
-                        }
-                        if (v != _passwordController.text) {
-                          return 'Las contraseñas no coinciden';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 32),
 
-                    // SECCIÓN: Acción principal
-                    Semantics(
-                      button: true,
-                      label: 'Crear cuenta en VíaLibre TJ',
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4285F4),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(32),
+                    // SECCIÓN: Formulario
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          // Campo nombre completo
+                          TextFormField(
+                            controller: _nameController,
+                            keyboardType: TextInputType.name,
+                            textCapitalization: TextCapitalization.words,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
+                            decoration: InputDecoration(
+                              labelText: 'Nombre completo',
+                              hintText: 'Ej. María López García',
+                              prefixIcon: const Icon(
+                                Icons.person_rounded,
+                                color: Color(0xFF4285F4),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF4285F4),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Ingresa tu nombre completo';
+                              }
+                              if (v.trim().split(' ').length < 2) {
+                                return 'Ingresa nombre y apellido';
+                              }
+                              return null;
+                            },
                           ),
-                          onPressed: _isLoading ? null : _handleRegister,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                              : const Text(
-                                  'Crear cuenta',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
+                          const SizedBox(height: 16),
+
+                          // Campo teléfono
+                          TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Número de teléfono',
+                              hintText: '10 dígitos',
+                              prefixIcon: const Icon(
+                                Icons.phone_rounded,
+                                color: Color(0xFF4285F4),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF4285F4),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Ingresa tu número de teléfono';
+                              }
+                              if (v.length < 10) {
+                                return 'El número debe tener 10 dígitos';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Campo contraseña
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Contraseña',
+                              hintText: 'Mínimo 6 caracteres',
+                              prefixIcon: const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xFF4285F4),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
+                                  color: const Color(0xFF9AA0A6),
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF4285F4),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Ingresa una contraseña';
+                              }
+                              if (v.length < 6) return 'Mínimo 6 caracteres';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Campo confirmar contraseña
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirm,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Confirmar contraseña',
+                              prefixIcon: const Icon(
+                                Icons.lock_outline_rounded,
+                                color: Color(0xFF4285F4),
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirm
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
+                                  color: const Color(0xFF9AA0A6),
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureConfirm = !_obscureConfirm,
+                                ),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF4285F4),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Confirma tu contraseña';
+                              }
+                              if (v != _passwordController.text) {
+                                return 'Las contraseñas no coinciden';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 32),
+
+                          // SECCIÓN: Acción principal
+                          Semantics(
+                            button: true,
+                            label: 'Crear cuenta en PASO',
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4285F4),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(32),
                                   ),
                                 ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                                onPressed: _isLoading ? null : _handleRegister,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Crear cuenta',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
 
-                    // SECCIÓN: Términos
-                    const Center(
-                      child: Text(
-                        'Al registrarte aceptas que tus datos se usen\npara mejorar la accesibilidad en Tijuana.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          height: 1.5,
-                        ),
+                          // SECCIÓN: Términos
+                          const Center(
+                            child: Text(
+                              'Al registrarte aceptas que tus datos se usen\npara mejorar la accesibilidad en Tijuana.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
