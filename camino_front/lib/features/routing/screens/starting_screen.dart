@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:camino_front/shared/services/permission_service.dart';
 import 'route_details_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 
@@ -12,10 +14,90 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _locationGranted = false;
+
   static const _initialPosition = CameraPosition(
     target: LatLng(32.5149, -117.0382),
     zoom: 14.0,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    if (kIsWeb) {
+      setState(() => _locationGranted = true);
+      return;
+    }
+    final granted = await PermissionService.requestLocationPermission();
+    if (!mounted) return;
+    setState(() => _locationGranted = granted);
+    if (!granted) {
+      _showPermissionDialog();
+    }
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.location_on_rounded,
+                color: Color(0xFF4285F4), size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Ubicación necesaria',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: const Text(
+          'PASO necesita acceso a tu ubicación para mostrarte '
+          'rutas accesibles en tiempo real y reportar barreras '
+          'cerca de ti.',
+          style: TextStyle(
+              fontSize: 15, color: Colors.black87, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Ahora no',
+              style: TextStyle(
+                  color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4285F4),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await PermissionService.openSettings();
+            },
+            child: const Text(
+              'Abrir ajustes',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -31,7 +113,7 @@ class _MapScreenState extends State<MapScreen> {
           // Map Background
           GoogleMap(
             initialCameraPosition: _initialPosition,
-            myLocationEnabled: true,
+            myLocationEnabled: _locationGranted,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
