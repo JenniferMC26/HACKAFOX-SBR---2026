@@ -3,7 +3,12 @@ import 'package:camino_front/features/reporting/screens/report_barrier_screen.da
 import 'package:camino_front/features/emergency/screens/panic_screen.dart';
 
 class NavigationScreen extends StatefulWidget {
-  const NavigationScreen({super.key});
+  const NavigationScreen({
+    super.key,
+    this.destination = 'IMSS Clínica 1 — Tijuana',
+  });
+
+  final String destination;
 
   @override
   State<NavigationScreen> createState() => _NavigationScreenState();
@@ -11,7 +16,13 @@ class NavigationScreen extends StatefulWidget {
 
 class _NavigationScreenState extends State<NavigationScreen> {
   final bool _hasAlert = true;
-  final String _destination = "IMSS Clínica 1 — Tijuana";
+  late final String _destination;
+
+  @override
+  void initState() {
+    super.initState();
+    _destination = widget.destination;
+  }
   final String _mobilityMode = "Silla de ruedas";
   final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
 

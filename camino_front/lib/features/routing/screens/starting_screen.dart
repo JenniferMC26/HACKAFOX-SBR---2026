@@ -2,8 +2,21 @@ import 'package:flutter/material.dart';
 import 'route_details_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 
-class MapScreen extends StatelessWidget {
+class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +44,7 @@ class MapScreen extends StatelessWidget {
                       color: Color(0xFF9AA0A6),
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.2,
-                      fontSize: 16, // Asegurando legibilidad mínima de 16sp
+                      fontSize: 16,
                     ),
                   ),
                 ],
@@ -59,9 +72,8 @@ class MapScreen extends StatelessWidget {
                   horizontal: 4.0,
                   vertical: 4.0,
                 ),
-                // MODIFICACIÓN: Se agregó el ícono de micrófono (Icons.mic_rounded) como suffixIcon
-                // con el color de acción primaria #4285F4 (azul Google).
                 child: TextField(
+                  controller: _searchController,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
@@ -95,8 +107,7 @@ class MapScreen extends StatelessWidget {
           // MODIFICACIÓN: Se agregó un FAB secundario para reportar barreras usando el color
           // amarillo Google (#FBBC04). Se envolvió en Semantics para lectores de pantalla.
           Positioned(
-            bottom:
-                120, // Posicionado de forma segura por encima del botón principal
+            bottom: 120,
             right: 20,
             child: Semantics(
               button: true,
@@ -127,14 +138,11 @@ class MapScreen extends StatelessWidget {
             bottom: 40,
             left: 20,
             right: 20,
-            // MODIFICACIÓN: Se agregó soporte Semantics con label descriptivo.
-            // El CTA principal ahora es azul (#4285F4) con texto/ícono en blanco, mejorando el contraste y jerarquía.
             child: Semantics(
               button: true,
               label: 'Confirmar destino para calcular ruta accesible',
               child: Container(
-                height:
-                    64, // Cumple holgadamente con el min tap target de 48x48dp
+                height: 64,
                 decoration: BoxDecoration(
                   boxShadow: [
                     BoxShadow(
@@ -154,10 +162,20 @@ class MapScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
+                    final destination = _searchController.text.trim();
+                    if (destination.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Ingresa un destino para continuar'),
+                          backgroundColor: Color(0xFF4285F4),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const RouteDetailsScreen(),
+                        builder: (_) => RouteDetailsScreen(destination: destination),
                       ),
                     );
                   },
