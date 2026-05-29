@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:camino_front/features/splash/screens/splash_screen.dart';
 import 'package:camino_front/features/auth/screens/login_screen.dart';
 import 'package:camino_front/features/auth/screens/register_screen.dart';
 import 'package:camino_front/features/auth/screens/onboarding_mobility_screen.dart';
@@ -11,25 +12,27 @@ import 'package:camino_front/features/reporting/screens/barrier_confirmed_screen
 
 class AppRoutes {
   AppRoutes._();
+  static const splash              = '/splash';
   static const login               = '/login';
   static const register            = '/register';
   static const onboardingMobility  = '/onboarding-mobility';
   static const panic               = '/panic';
-  static const home                = '/';
+  static const home                = '/home';
   static const routeDetails        = '/route-details';
   static const navigation          = '/navigation';
   static const reportBarrier       = '/report-barrier';
   static const barrierConfirmed    = '/barrier-confirmed';
 
   static Map<String, WidgetBuilder> get routes => {
+    splash:             (_) => const SplashScreen(),
     login:              (_) => const LoginScreen(),
     register:           (_) => const RegisterScreen(),
     onboardingMobility: (_) => const OnboardingMobilityScreen(),
     panic:              (_) => const PanicScreen(),
     home:               (_) => const MapScreen(),
-    routeDetails:     (_) => const RouteDetailsScreen(),
-    navigation:       (_) => const NavigationScreen(),
-    reportBarrier:    (_) => const ReportBarrierScreen(),
-    barrierConfirmed: (_) => const BarrierConfirmedScreen(),
+    routeDetails:       (_) => const RouteDetailsScreen(),
+    navigation:         (_) => const NavigationScreen(),
+    reportBarrier:      (_) => const ReportBarrierScreen(),
+    barrierConfirmed:   (_) => const BarrierConfirmedScreen(),
   };
 }

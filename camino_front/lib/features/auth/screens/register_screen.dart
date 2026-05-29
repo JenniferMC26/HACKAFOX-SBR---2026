@@ -68,6 +68,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // SECCIÓN: Header
+                    Center(
+                      child: Image.asset(
+                        'assets/images/logo_icon.png',
+                        height: 64,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text(
                       '¡Bienvenido a PASO!',
                       style: TextStyle(
