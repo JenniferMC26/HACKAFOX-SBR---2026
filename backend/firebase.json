@@ -14,7 +14,17 @@
   ],
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/config",             "function": "config" },
+      { "source": "/routing/accessible", "function": "routingAccessible" },
+      { "source": "/reports/submit",     "function": "reportSubmit" },
+      { "source": "/ruta-viva/score",    "function": "rutaVivaScore" },
+      { "source": "/voice/query",        "function": "voiceQuery" },
+      { "source": "/crisis/start",       "function": "crisisStart" },
+      { "source": "/crisis/update",      "function": "crisisUpdate" },
+      { "source": "/crisis/resolve",     "function": "crisisResolve" }
+    ]
   },
   "emulators": {
     "functions": { "port": 5001, "host": "0.0.0.0" },

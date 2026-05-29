@@ -321,12 +321,10 @@ function showJsError(msg) {
   console.error(msg);
 }
 
-const FUNCTIONS_BASE = location.hostname === 'localhost'
-  ? 'http://localhost:5001/paso/us-central1'
-  : '';   // mismo host en producción
-
+// Las Cloud Functions se sirven en mismo origen vía Hosting rewrites (firebase.json).
+// Sirve igual en :5000 (emulator) y en producción.
 async function loadConfig() {
-  const res = await fetch(`${FUNCTIONS_BASE}/config`);
+  const res = await fetch('/config');
   if (!res.ok) throw new Error('/config ' + res.status);
   const c = await res.json();
   SUPABASE_URL        = c.supabaseUrl        || '';
