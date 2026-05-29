@@ -99,7 +99,58 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 1.6 Secuencia atómica para ticket_id formateado como PASO-YYYY-NNNN.
+-- 1.6 Historial de reportes para analítica (reemplaza BigQuery accessibility_reports).
+CREATE TABLE IF NOT EXISTS public.accessibility_reports (
+  id           TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  report_id    TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  lat          FLOAT8 NOT NULL,
+  lng          FLOAT8 NOT NULL,
+  location     GEOGRAPHY(POINT, 4326)
+               GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography) STORED,
+  barrier_type TEXT,
+  severity     INT,
+  hour_of_day  INT,
+  day_of_week  INT,
+  weather_condition TEXT,
+  reported_at  TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at  TIMESTAMPTZ
+);
+
+-- 1.7 Patrones temporales para Ruta Viva (reemplaza BigQuery temporal_patterns).
+CREATE TABLE IF NOT EXISTS public.temporal_patterns (
+  id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  lat                 FLOAT8 NOT NULL,
+  lng                 FLOAT8 NOT NULL,
+  location            GEOGRAPHY(POINT, 4326)
+                      GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography) STORED,
+  hour_of_day         INT NOT NULL CHECK (hour_of_day BETWEEN 0 AND 23),
+  day_of_week         INT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  accessibility_score FLOAT8 NOT NULL CHECK (accessibility_score BETWEEN 0 AND 1),
+  event_flag          BOOLEAN DEFAULT FALSE,
+  report_count        INT DEFAULT 0
+);
+
+-- 1.8 Tickets cívicos formales (reemplaza BigQuery civic_tickets).
+CREATE TABLE IF NOT EXISTS public.civic_tickets (
+  id                      TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  ticket_id               TEXT NOT NULL UNIQUE,
+  report_id               TEXT NOT NULL,
+  lat                     FLOAT8 NOT NULL,
+  lng                     FLOAT8 NOT NULL,
+  location                GEOGRAPHY(POINT, 4326)
+                          GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography) STORED,
+  barrier_type            TEXT,
+  severity                INT,
+  photo_url               TEXT,
+  gemini_description      TEXT,
+  affected_users_estimate INT,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  assigned_to             TEXT,
+  status                  TEXT DEFAULT 'open' CHECK (status IN ('open', 'assigned', 'resolved'))
+);
+
+-- 1.9 Secuencia atómica para ticket_id formateado como PASO-YYYY-NNNN.
 CREATE SEQUENCE IF NOT EXISTS public.ticket_seq START 1;
 
 
@@ -110,9 +161,15 @@ CREATE SEQUENCE IF NOT EXISTS public.ticket_seq START 1;
 CREATE INDEX IF NOT EXISTS idx_nodes_location    ON public.accessibility_nodes USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_reports_location  ON public.reports             USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_crisis_location   ON public.crisis_sessions     USING GIST (current_location);
+CREATE INDEX IF NOT EXISTS idx_ar_location       ON public.accessibility_reports USING GIST (location);
+CREATE INDEX IF NOT EXISTS idx_tp_location       ON public.temporal_patterns   USING GIST (location);
+CREATE INDEX IF NOT EXISTS idx_tickets_location  ON public.civic_tickets       USING GIST (location);
 
 CREATE INDEX IF NOT EXISTS idx_reports_user_created ON public.reports (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notif_recipient_read ON public.notifications (recipient_id, read);
+CREATE INDEX IF NOT EXISTS idx_ar_reported_at       ON public.accessibility_reports (reported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tp_hour_dow          ON public.temporal_patterns (hour_of_day, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_tickets_status       ON public.civic_tickets (status, created_at DESC);
 
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -233,16 +290,36 @@ BEGIN
 END;
 $$;
 
+-- 3.6 Score histórico promedio para Ruta Viva (sustituye query a BigQuery).
+-- Promedia accessibility_score de temporal_patterns en radio 200m para una
+-- hora/día específicos. Devuelve 0 filas si no hay datos suficientes.
+CREATE OR REPLACE FUNCTION public.ruta_viva_history(
+  p_lat FLOAT8, p_lng FLOAT8, p_hour INT, p_dow INT, p_radius_m FLOAT8 DEFAULT 200
+) RETURNS TABLE(avg_score FLOAT8, data_points BIGINT, has_event BOOLEAN)
+LANGUAGE sql STABLE AS $$
+  SELECT
+    AVG(accessibility_score) AS avg_score,
+    COUNT(*)                 AS data_points,
+    bool_or(event_flag)      AS has_event
+  FROM public.temporal_patterns
+  WHERE hour_of_day = p_hour
+    AND day_of_week = p_dow
+    AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography, p_radius_m);
+$$;
+
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 4. Row Level Security
 -- ────────────────────────────────────────────────────────────────────────────
 
-ALTER TABLE public.accessibility_nodes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reports             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.crisis_sessions     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_profiles       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accessibility_nodes   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.crisis_sessions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_profiles         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accessibility_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.temporal_patterns     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.civic_tickets         ENABLE ROW LEVEL SECURITY;
 
 -- accessibility_nodes: lectura pública, escritura solo service_role.
 DROP POLICY IF EXISTS "nodes_read_public" ON public.accessibility_nodes;
@@ -295,6 +372,29 @@ CREATE POLICY "notif_own_update" ON public.notifications
 
 DROP POLICY IF EXISTS "notif_admin_write" ON public.notifications;
 CREATE POLICY "notif_admin_write" ON public.notifications
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- accessibility_reports: lectura solo service_role (contiene user_id sensible).
+DROP POLICY IF EXISTS "ar_admin_all" ON public.accessibility_reports;
+CREATE POLICY "ar_admin_all" ON public.accessibility_reports
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- temporal_patterns: lectura pública (datos abiertos), escritura admin.
+DROP POLICY IF EXISTS "tp_read_public" ON public.temporal_patterns;
+CREATE POLICY "tp_read_public" ON public.temporal_patterns
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "tp_admin_write" ON public.temporal_patterns;
+CREATE POLICY "tp_admin_write" ON public.temporal_patterns
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- civic_tickets: lectura pública (transparencia), escritura admin.
+DROP POLICY IF EXISTS "tickets_read_public" ON public.civic_tickets;
+CREATE POLICY "tickets_read_public" ON public.civic_tickets
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "tickets_admin_write" ON public.civic_tickets;
+CREATE POLICY "tickets_admin_write" ON public.civic_tickets
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 
