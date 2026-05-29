@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
+import 'package:camino_front/features/emergency/screens/panic_screen.dart';
 
 class NavigationScreen extends StatefulWidget {
   const NavigationScreen({super.key});
@@ -224,20 +225,86 @@ class _NavigationScreenState extends State<NavigationScreen> {
               child: Container(
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Semantics(
-                        button: true,
-                        label: "Reportar una barrera en la ruta actual",
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.report_problem_rounded),
-                          label: const Text("Reportar barrera"),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF4285F4),
-                            side: const BorderSide(color: Color(0xFF4285F4)),
-                            minimumSize: const Size(double.infinity, 56),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Semantics(
+                            button: true,
+                            label: "Reportar una barrera en la ruta actual",
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.report_problem_rounded),
+                              label: const Text("Reportar barrera"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF4285F4),
+                                side: const BorderSide(color: Color(0xFF4285F4)),
+                                minimumSize: const Size(double.infinity, 56),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(32),
+                                ),
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ReportBarrierScreen(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Semantics(
+                            button: true,
+                            label: "Terminar navegación y volver al inicio",
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.stop_circle_rounded),
+                              label: const Text("Finalizar viaje"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFEA4335),
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 56),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(32),
+                                ),
+                              ),
+                              onPressed: () => Navigator.popUntil(
+                                context,
+                                (route) => route.isFirst,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Semantics(
+                      button: true,
+                      label: 'Activar botón de pánico de emergencia',
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.warning_rounded),
+                          label: const Text(
+                            'Botón de pánico',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFDECEA),
+                            foregroundColor: const Color(0xFFEA4335),
                             elevation: 0,
+                            side: const BorderSide(
+                              color: Color(0xFFEA4335),
+                              width: 1.5,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(32),
                             ),
@@ -245,32 +312,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ReportBarrierScreen(),
+                              builder: (_) => const PanicScreen(),
                             ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Semantics(
-                        button: true,
-                        label: "Terminar navegación y volver al inicio",
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.stop_circle_rounded),
-                          label: const Text("Finalizar viaje"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFEA4335),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 56),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(32),
-                            ),
-                          ),
-                          onPressed: () => Navigator.popUntil(
-                            context,
-                            (route) => route.isFirst,
                           ),
                         ),
                       ),
