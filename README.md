@@ -237,14 +237,14 @@ PASO está construido siguiendo los estándares **WCAG AA**:
 ---
 
 ## 👥 Equipo — Hackafox 2026
-
+ 
 | Rol | Integrante | GitHub |
 |-----|-----------|--------|
 | Frontend Developer | Jennifer MC | [@JenniferMC26](https://github.com/JenniferMC26) |
-| Frontend Developer | *(nombre compañera)* | *(usuario GitHub)* |
-| Backend Developer | *(nombre)* | *(usuario GitHub)* |
-| Backend Developer | *(nombre)* | *(usuario GitHub)* |
-
+| Frontend Developer | Prina Meredith | [@MerelyMeredith](https://github.com/MerelyMeredith) |
+| Backend Developer | Angel Castro | [@Tenshi145](https://github.com/Tenshi145) |
+| Backend Developer | Yael Kristoph Triana Sánchez | [@YaelTriana](https://github.com/YaelTriana) |
+ 
 ---
 
 ## 📄 Licencia
