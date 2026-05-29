@@ -1,0 +1,38 @@
+[
+  {
+    "nodeId": "node_imss_zonario_entrada",
+    "lat": 32.5248,
+    "lng": -117.0284,
+    "photo": "imss_entrada.jpg"
+  },
+  {
+    "nodeId": "node_hospital_general_entrada",
+    "lat": 32.5189,
+    "lng": -117.0289,
+    "photo": "hospital_general_entrada.jpg"
+  },
+  {
+    "nodeId": "node_rampa_destruida_av4",
+    "lat": 32.5311,
+    "lng": -117.0362,
+    "photo": "rampa_destruida_av4.jpg"
+  },
+  {
+    "nodeId": "node_banqueta_rota_calle2",
+    "lat": 32.5300,
+    "lng": -117.0350,
+    "photo": "banqueta_rota_calle2.jpg"
+  },
+  {
+    "nodeId": "node_semaforo_constitucion",
+    "lat": 32.5310,
+    "lng": -117.0340,
+    "photo": "semaforo_constitucion.jpg"
+  },
+  {
+    "nodeId": "node_parada_ruta3_constitucion",
+    "lat": 32.5298,
+    "lng": -117.0335,
+    "photo": "parada_ruta3.jpg"
+  }
+]
