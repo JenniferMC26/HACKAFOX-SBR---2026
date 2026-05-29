@@ -16,7 +16,8 @@ class NavigationScreen extends StatefulWidget {
 }
 
 class _NavigationScreenState extends State<NavigationScreen> {
-  final bool _hasAlert = true;
+  bool _hasAlert = true;
+  bool _isAlternativeRoute = false;
   late final String _destination;
   GoogleMapController? _mapController;
 
@@ -30,6 +31,45 @@ class _NavigationScreenState extends State<NavigationScreen> {
       markerId: MarkerId('destination'),
       position: LatLng(32.5169, -117.0352),
       infoWindow: InfoWindow(title: 'IMSS Clínica 1'),
+    ),
+  };
+
+  final Set<Marker> _barrierMarkers = {
+    Marker(
+      markerId: const MarkerId('barrier_1'),
+      position: const LatLng(32.5158, -117.0371),
+      infoWindow: const InfoWindow(
+        title: '⚠️ Barrera alta',
+        snippet: 'Banqueta destruida · Reportado hace 10 min',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+    ),
+    Marker(
+      markerId: const MarkerId('barrier_2'),
+      position: const LatLng(32.5163, -117.0365),
+      infoWindow: const InfoWindow(
+        title: '⚠️ Barrera media',
+        snippet: 'Auto bloqueando rampa · Reportado hace 25 min',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+    ),
+    Marker(
+      markerId: const MarkerId('barrier_3'),
+      position: const LatLng(32.5155, -117.0378),
+      infoWindow: const InfoWindow(
+        title: '✅ Barrera leve',
+        snippet: 'Bache pequeño · Reportado hace 1 hora',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    ),
+    Marker(
+      markerId: const MarkerId('destination'),
+      position: const LatLng(32.5169, -117.0352),
+      infoWindow: const InfoWindow(
+        title: '🏥 IMSS Clínica 1',
+        snippet: 'Tu destino',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
     ),
   };
 
@@ -53,6 +93,33 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _destination = widget.destination;
   }
 
+  void _switchToAlternativeRoute() {
+    setState(() {
+      _hasAlert = false;
+      _isAlternativeRoute = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Ruta alternativa calculada',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF34A853),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   final String _mobilityMode = "Silla de ruedas";
   final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
 
@@ -65,7 +132,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
           GoogleMap(
             initialCameraPosition: _initialPosition,
             onMapCreated: (controller) => _mapController = controller,
-            markers: _markers,
+            markers: {..._markers, ..._barrierMarkers},
             polylines: _polylines,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
@@ -117,9 +184,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
                             size: 16,
                           ),
                           const SizedBox(width: 6),
-                          const Text(
-                            "14 min · 1.1 km",
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          Text(
+                            _isAlternativeRoute
+                                ? "19 min · 1.6 km — ruta alternativa"
+                                : "14 min · 1.1 km",
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.grey),
                           ),
                           Text(
                             " · $_mobilityMode",
@@ -131,6 +201,32 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           ),
                         ],
                       ),
+                      if (_isAlternativeRoute)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4EA),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.alt_route_rounded,
+                                  size: 12, color: Color(0xFF34A853)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Evita 1 barrera',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF34A853),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -193,7 +289,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: _switchToAlternativeRoute,
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFF4285F4),
                           textStyle: const TextStyle(
