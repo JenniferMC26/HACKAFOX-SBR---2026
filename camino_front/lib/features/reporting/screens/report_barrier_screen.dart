@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:camino_front/features/reporting/screens/barrier_confirmed_screen.dart';
 
 enum _ReportState { takingPhoto, analyzing, result }
@@ -16,6 +19,9 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
   int _severityLevel = 0;
   String _analysisDescription = "";
   bool _photoSelected = false;
+  // ignore: unused_field
+  XFile? _photoFile;
+  final ImagePicker _picker = ImagePicker();
 
   Future<void> _runAnalysis() async {
     await Future.delayed(const Duration(seconds: 2));
@@ -27,6 +33,84 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
       _analysisDescription =
           "Se detecta daño severo en banqueta peatonal. Bloqueo total del paso para silla de ruedas y andadera. Ubicación: Calle 3ra entre Av. Revolución y Constitución, Centro Tijuana. Requiere intervención municipal urgente.";
     });
+  }
+
+  Future<void> _takePhoto() async {
+    // PERMISO EN ANDROID
+    if (!kIsWeb) {
+      final cameraStatus = await Permission.camera.request();
+      if (!cameraStatus.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'PASO necesita acceso a la cámara '
+                'para fotografiar la barrera'),
+            backgroundColor: const Color(0xFFEA4335),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        return;
+      }
+    }
+
+    // PERMISO EN WEB — el navegador lo pide automáticamente
+    if (kIsWeb) {
+      final granted = await _requestWebCameraPermission();
+      if (!granted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Permite el acceso a la cámara '
+                'en tu navegador para continuar'),
+            backgroundColor: const Color(0xFFEA4335),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        return;
+      }
+    }
+
+    // ABRIR CÁMARA — igual en web y Android
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+      if (photo != null && mounted) {
+        setState(() {
+          _photoFile = photo;
+          _photoSelected = true;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'No se pudo acceder a la cámara: '
+              'verifica los permisos del navegador'),
+          backgroundColor: const Color(0xFFEA4335),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  Future<bool> _requestWebCameraPermission() async {
+    try {
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   Color _severityColor() {
@@ -124,11 +208,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
               ),
               const SizedBox(height: 32),
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _photoSelected = true;
-                  });
-                },
+                onTap: _takePhoto,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: double.infinity,
@@ -197,7 +277,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                     side: const BorderSide(color: Color(0xFF4285F4)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(32))),
-                  onPressed: () => setState(() => _photoSelected = true))),
+                  onPressed: _takePhoto)),
               const SizedBox(height: 24),
               Semantics(
                 button: true,
