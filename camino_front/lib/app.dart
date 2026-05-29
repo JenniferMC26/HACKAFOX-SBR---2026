@@ -13,7 +13,7 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routes: AppRoutes.routes,
-      initialRoute: AppRoutes.home,
+      initialRoute: AppRoutes.login,
     );
   }
 }
