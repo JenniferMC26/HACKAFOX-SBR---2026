@@ -51,8 +51,8 @@ async function fetchMapsRoute(origin, destination) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      origin: { location: { latLng: origin } },
-      destination: { location: { latLng: destination } },
+      origin:      { location: { latLng: { latitude: origin.lat,      longitude: origin.lng      } } },
+      destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
       travelMode: 'WALK',
       computeAlternativeRoutes: false,
     }),

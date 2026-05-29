@@ -30,6 +30,7 @@ exports.config = wrap(async (req, res) => {
   res.json({
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+    mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
   });
 });
 

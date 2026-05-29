@@ -110,7 +110,19 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
   if (reportErr) throw new Error(`reports.insert: ${reportErr.message}`);
 
   // 7. Espejo histórico en accessibility_reports (fire-and-forget)
+  // FIX: use Tijuana local time (UTC-7) — not UTC — so temporal analytics
+  // match the actual hour/day the user experienced the barrier.
   const now = new Date();
+  const tjParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Tijuana',
+    hour: 'numeric',
+    weekday: 'short',
+    hour12: false,
+  }).formatToParts(now);
+  const hourTJ = parseInt(tjParts.find((p) => p.type === 'hour').value, 10);
+  const dowMapTJ = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+  const dowTJ = dowMapTJ[tjParts.find((p) => p.type === 'weekday').value];
+
   insertHistory('accessibility_reports', {
     report_id: reportRow.id,
     user_id: uid,
@@ -118,8 +130,8 @@ async function submitReport({ uid, lat, lng, photoUrl, weather }) {
     lng,
     barrier_type: analysis.barrierType,
     severity: analysis.severity,
-    hour_of_day: now.getUTCHours(),
-    day_of_week: (now.getUTCDay() + 6) % 7,
+    hour_of_day: hourTJ,
+    day_of_week: dowTJ,
     weather_condition: weather || null,
     reported_at: reportRow.created_at,
   });
