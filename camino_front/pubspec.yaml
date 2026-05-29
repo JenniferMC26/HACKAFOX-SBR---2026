@@ -27,6 +27,7 @@ flutter:
   assets:
     - assets/images/logo_icon.png
     - assets/images/logo_full.png
+    - assets/data/detections_categorized.csv
 
 flutter_launcher_icons:
   android: true

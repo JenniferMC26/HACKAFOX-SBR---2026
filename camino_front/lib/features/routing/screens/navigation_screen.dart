@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 import 'package:camino_front/features/emergency/screens/panic_screen.dart';
+import 'package:camino_front/features/routing/services/routing_service.dart';
+import 'package:camino_front/features/routing/services/route_graph.dart';
 
 class NavigationScreen extends StatefulWidget {
   const NavigationScreen({
@@ -21,18 +23,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
   late final String _destination;
   GoogleMapController? _mapController;
 
+  // Ruteo real
+  double _minScoreThreshold = 2.0;
+  LatLng? _tappedDestination;
+  RouteResult? _currentRoute;
+  bool _isCalculatingRoute = false;
+  final bool _showIntersections = false;
+
   static const _initialPosition = CameraPosition(
     target: LatLng(32.5149, -117.0382),
     zoom: 15.5,
   );
-
-  final Set<Marker> _markers = {
-    const Marker(
-      markerId: MarkerId('destination'),
-      position: LatLng(32.5169, -117.0352),
-      infoWindow: InfoWindow(title: 'IMSS Clínica 1'),
-    ),
-  };
 
   final Set<Marker> _barrierMarkers = {
     Marker(
@@ -82,24 +83,71 @@ class _NavigationScreenState extends State<NavigationScreen> {
     ),
   };
 
-  final Set<Polyline> _polylines = {
-    const Polyline(
-      polylineId: PolylineId('route'),
-      points: [
-        LatLng(32.5149, -117.0382),
-        LatLng(32.5155, -117.0370),
-        LatLng(32.5162, -117.0358),
-        LatLng(32.5169, -117.0352),
-      ],
-      color: Color(0xFF4285F4),
-      width: 5,
-    ),
-  };
+  final String _mobilityMode = "Silla de ruedas";
+  final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
 
   @override
   void initState() {
     super.initState();
     _destination = widget.destination;
+    _initRouting();
+  }
+
+  Future<void> _initRouting() async {
+    await RoutingService.instance.initialize();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _calculateRoute(LatLng destination) async {
+    setState(() {
+      _isCalculatingRoute = true;
+      _tappedDestination = destination;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    const origin = LatLng(32.5149, -117.0382);
+    final result = RoutingService.instance.findRoute(
+      origin: origin,
+      destination: destination,
+      minScore: _minScoreThreshold,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _currentRoute = result;
+      _isCalculatingRoute = false;
+    });
+
+    if (result.found) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Ruta encontrada · ${result.segmentsCount} tramos · '
+            'Accesibilidad: ${result.avgAccessibility.toStringAsFixed(1)}/4.0',
+          ),
+          backgroundColor: const Color(0xFF34A853),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'No hay ruta con ese nivel mínimo de accesibilidad. '
+            'Intenta bajar el filtro.',
+          ),
+          backgroundColor: const Color(0xFFEA4335),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 
   void _switchToAlternativeRoute() {
@@ -109,8 +157,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: const [
+        content: const Row(
+          children: [
             Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
             SizedBox(width: 8),
             Text(
@@ -122,15 +170,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
         backgroundColor: const Color(0xFF34A853),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  final String _mobilityMode = "Silla de ruedas";
-  final String _alertMessage = "Banqueta bloqueada · Calle 2da y Constitución";
+  Color _scoreColor(double score) {
+    if (score >= 3.5) return const Color(0xFF34A853);
+    if (score >= 2.5) return const Color(0xFF4285F4);
+    if (score >= 1.5) return const Color(0xFFFBBC04);
+    return const Color(0xFFEA4335);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,8 +191,48 @@ class _NavigationScreenState extends State<NavigationScreen> {
           GoogleMap(
             initialCameraPosition: _initialPosition,
             onMapCreated: (controller) => _mapController = controller,
-            markers: {..._markers, ..._barrierMarkers},
-            polylines: _polylines,
+            markers: {
+              ..._barrierMarkers,
+              if (_tappedDestination != null)
+                Marker(
+                  markerId: const MarkerId('tapped_dest'),
+                  position: _tappedDestination!,
+                  infoWindow: const InfoWindow(
+                    title: '🎯 Destino seleccionado',
+                  ),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueViolet,
+                  ),
+                ),
+              if (_showIntersections)
+                ...RoutingService.instance.intersectionMarkers,
+            },
+            polylines: {
+              if (_currentRoute == null)
+                const Polyline(
+                  polylineId: PolylineId('route_default'),
+                  points: [
+                    LatLng(32.5149, -117.0382),
+                    LatLng(32.5155, -117.0370),
+                    LatLng(32.5162, -117.0358),
+                    LatLng(32.5169, -117.0352),
+                  ],
+                  color: Color(0xFF4285F4),
+                  width: 5,
+                ),
+              if (_currentRoute != null && _currentRoute!.found)
+                Polyline(
+                  polylineId: const PolylineId('route_calculated'),
+                  points: _currentRoute!.polylinePoints,
+                  color: const Color(0xFF34A853),
+                  width: 6,
+                  patterns: [
+                    PatternItem.dash(20),
+                    PatternItem.gap(10),
+                  ],
+                ),
+            },
+            onTap: _calculateRoute,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
@@ -198,7 +288,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                 ? "19 min · 1.6 km — ruta alternativa"
                                 : "14 min · 1.1 km",
                             style: const TextStyle(
-                                fontSize: 14, color: Colors.grey),
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
                           ),
                           Text(
                             " · $_mobilityMode",
@@ -214,7 +306,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         Container(
                           margin: const EdgeInsets.only(top: 4),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE6F4EA),
                             borderRadius: BorderRadius.circular(8),
@@ -222,8 +316,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.alt_route_rounded,
-                                  size: 12, color: Color(0xFF34A853)),
+                              Icon(
+                                Icons.alt_route_rounded,
+                                size: 12,
+                                color: Color(0xFF34A853),
+                              ),
                               SizedBox(width: 4),
                               Text(
                                 'Evita 1 barrera',
@@ -354,7 +451,162 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ),
           ),
 
-          // CAPA 5 — Barra inferior
+          // CAPA 5 — Panel de filtro de accesibilidad
+          Positioned(
+            bottom: 180,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.tune_rounded,
+                        color: Color(0xFF4285F4),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Filtro de accesibilidad mínima",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _scoreColor(_minScoreThreshold),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_minScoreThreshold.toStringAsFixed(1)} / 4.0',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Text(
+                        'Más rutas',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            activeTrackColor: const Color(0xFF4285F4),
+                            thumbColor: const Color(0xFF4285F4),
+                            inactiveTrackColor: const Color(0xFFE0E0E0),
+                            overlayColor: const Color(0xFF4285F4)
+                                .withValues(alpha: 0.2),
+                            trackHeight: 4,
+                          ),
+                          child: Slider(
+                            value: _minScoreThreshold,
+                            min: 1.0,
+                            max: 4.0,
+                            divisions: 6,
+                            onChanged: (value) {
+                              setState(() => _minScoreThreshold = value);
+                              if (_tappedDestination != null) {
+                                _calculateRoute(_tappedDestination!);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        'Solo óptimas',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  if (_tappedDestination == null)
+                    const Center(
+                      child: Text(
+                        '👆 Toca cualquier punto del mapa para calcular la ruta',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else if (_isCalculatingRoute)
+                    const Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF4285F4),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Calculando ruta accesible...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_currentRoute != null && _currentRoute!.found)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF34A853),
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${(_currentRoute!.totalDistance / 1000).toStringAsFixed(2)} km · '
+                          '${_currentRoute!.segmentsCount} tramos · '
+                          'Score: ${_currentRoute!.avgAccessibility.toStringAsFixed(1)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF34A853),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // CAPA 6 — Barra inferior
           Positioned(
             bottom: 0,
             left: 0,
@@ -378,7 +630,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                               label: const Text("Reportar barrera"),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF4285F4),
-                                side: const BorderSide(color: Color(0xFF4285F4)),
+                                side: const BorderSide(
+                                  color: Color(0xFF4285F4),
+                                ),
                                 minimumSize: const Size(double.infinity, 56),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
