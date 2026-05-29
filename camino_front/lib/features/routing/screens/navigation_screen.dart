@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:camino_front/core/services/location_service.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
 import 'package:camino_front/features/emergency/screens/panic_screen.dart';
 import 'package:camino_front/features/routing/services/routing_service.dart';
@@ -9,9 +10,15 @@ class NavigationScreen extends StatefulWidget {
   const NavigationScreen({
     super.key,
     this.destination = 'IMSS Clínica 1 — Tijuana',
+    this.destinationLat,
+    this.destinationLng,
   });
 
   final String destination;
+  /// Latitud del destino seleccionado desde el buscador (puede ser null).
+  final double? destinationLat;
+  /// Longitud del destino seleccionado desde el buscador (puede ser null).
+  final double? destinationLng;
 
   @override
   State<NavigationScreen> createState() => _NavigationScreenState();
@@ -23,6 +30,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
   late final String _destination;
   GoogleMapController? _mapController;
 
+  // GPS real del usuario — se obtiene en _initRouting
+  LatLng? _originPosition;
+  static const _tijuanaCenter = LatLng(32.5149, -117.0382);
+
   // Ruteo real
   double _minScoreThreshold = 2.0;
   LatLng? _tappedDestination;
@@ -30,10 +41,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
   bool _isCalculatingRoute = false;
   final bool _showIntersections = false;
 
-  static const _initialPosition = CameraPosition(
-    target: LatLng(32.5149, -117.0382),
-    zoom: 15.5,
-  );
+  CameraPosition get _initialPosition => CameraPosition(
+        target: _originPosition ?? _tijuanaCenter,
+        zoom: 15.5,
+      );
 
   final Set<Marker> _barrierMarkers = {
     Marker(
@@ -94,8 +105,35 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _initRouting() async {
-    await RoutingService.instance.initialize();
-    if (mounted) setState(() {});
+    // Inicializar servicio de ruteo y obtener GPS real en paralelo
+    await Future.wait([
+      RoutingService.instance.initialize(),
+      _fetchOriginPosition(),
+    ]);
+
+    if (!mounted) return;
+    setState(() {});
+
+    // Auto-calcular ruta si el buscador nos pasó coordenadas del destino
+    if (widget.destinationLat != null && widget.destinationLng != null) {
+      _calculateRoute(LatLng(widget.destinationLat!, widget.destinationLng!));
+    }
+  }
+
+  /// Obtiene la posición GPS real del usuario. Si no está disponible, usa
+  /// el centro de Tijuana como fallback.
+  Future<void> _fetchOriginPosition() async {
+    final pos = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    setState(() {
+      _originPosition = pos;
+      // Mover cámara a la posición real del usuario
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: pos, zoom: 15.5),
+        ),
+      );
+    });
   }
 
   Future<void> _calculateRoute(LatLng destination) async {
@@ -106,7 +144,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
     await Future.delayed(const Duration(milliseconds: 100));
 
-    const origin = LatLng(32.5149, -117.0382);
+    // Fix: usar posición GPS real del usuario, con fallback al centro de Tijuana
+    final origin = _originPosition ?? _tijuanaCenter;
+
     final result = RoutingService.instance.findRoute(
       origin: origin,
       destination: destination,
@@ -190,7 +230,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
           // CAPA 1 — Fondo del mapa
           GoogleMap(
             initialCameraPosition: _initialPosition,
-            onMapCreated: (controller) => _mapController = controller,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              // Si ya tenemos GPS cuando el mapa se crea, centramos la cámara
+              if (_originPosition != null) {
+                controller.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(target: _originPosition!, zoom: 15.5),
+                  ),
+                );
+              }
+            },
             markers: {
               ..._barrierMarkers,
               if (_tappedDestination != null)
@@ -340,7 +390,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ),
           ),
 
-          // CAPA 3 — Card de alerta (solo si _hasAlert == true)
+          // CAPA 3 — Card de alerta
           if (_hasAlert)
             Positioned(
               top: 130,
@@ -419,14 +469,14 @@ class _NavigationScreenState extends State<NavigationScreen> {
               button: true,
               label: "Centrar mapa en mi ubicación",
               child: GestureDetector(
-                onTap: () => _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    const CameraPosition(
-                      target: LatLng(32.5149, -117.0382),
-                      zoom: 16.0,
+                onTap: () {
+                  final target = _originPosition ?? _tijuanaCenter;
+                  _mapController?.animateCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(target: target, zoom: 16.0),
                     ),
-                  ),
-                ),
+                  );
+                },
                 child: Container(
                   width: 52,
                   height: 52,
@@ -677,14 +727,14 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     const SizedBox(height: 8),
                     Semantics(
                       button: true,
-                      label: 'Activar botón de pánico de emergencia',
+                      label: 'Me perdí — abrir pantalla de emergencia',
                       child: SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton.icon(
                           icon: const Icon(Icons.warning_rounded),
                           label: const Text(
-                            'Botón de pánico',
+                            'Me perdí',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,

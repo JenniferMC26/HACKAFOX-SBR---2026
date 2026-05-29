@@ -5,9 +5,15 @@ class RouteDetailsScreen extends StatefulWidget {
   const RouteDetailsScreen({
     super.key,
     this.destination = 'IMSS Clínica 1 — Tijuana',
+    this.destinationLat,
+    this.destinationLng,
   });
 
   final String destination;
+  /// Latitud del destino resuelto por Places Details (null si no disponible).
+  final double? destinationLat;
+  /// Longitud del destino resuelto por Places Details (null si no disponible).
+  final double? destinationLng;
 
   @override
   State<RouteDetailsScreen> createState() => _RouteDetailsScreenState();
@@ -102,7 +108,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
           ),
           const Expanded(
             child: Center(
-              // CAMBIO 1 — Color del indicador de carga
               child: CircularProgressIndicator(
                 color: Color(0xFF4285F4),
                 strokeWidth: 5,
@@ -130,7 +135,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          // CAMBIO 2 — Subtítulo de selección de movilidad
           const Text(
             '¿Cómo te desplazas?',
             style: TextStyle(
@@ -171,7 +175,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // CAMBIO 7 — Chips de estado dentro del card de detalles
                 Row(
                   children: [
                     Chip(
@@ -200,7 +203,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    // CAMBIO 6 — Color del tiempo de ruta
                     Text(
                       currentData["time"]!,
                       style: const TextStyle(
@@ -242,12 +244,10 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
               child: SizedBox(
                 width: double.infinity,
                 height: 60,
-                // CAMBIO 9 — Semántica del botón primario
                 child: Semantics(
                   label: "Iniciar navegación hacia $_foundLocation",
                   button: true,
                   child: ElevatedButton(
-                    // CAMBIO 8 — Botón primario: texto en español y color azul
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4285F4),
                       foregroundColor: Colors.white,
@@ -259,7 +259,12 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => NavigationScreen(destination: _foundLocation),
+                        builder: (_) => NavigationScreen(
+                          destination: _foundLocation,
+                          // Pasar coordenadas resueltas para auto-calcular ruta
+                          destinationLat: widget.destinationLat,
+                          destinationLng: widget.destinationLng,
+                        ),
                       ),
                     ),
                     child: const Text(
@@ -281,7 +286,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
 
   Widget _buildMobilityCard(String method, IconData icon) {
     final isSelected = _selectedMethod == method;
-    // CAMBIO 5 — Semántica en mobility cards
     return Semantics(
       label: "Seleccionar ruta para ${method.toLowerCase()}",
       button: true,
@@ -294,13 +298,11 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
         },
         child: Column(
           children: [
-            // CAMBIO 4 — Tamaño de tap target en mobility cards
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               height: 72,
               width: 72,
               decoration: BoxDecoration(
-                // CAMBIO 3 — Color de selección en mobility cards
                 color: isSelected ? const Color(0xFF4285F4) : Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -331,7 +333,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                // CAMBIO 3 — Color de selección en mobility cards
                 color: isSelected
                     ? const Color(0xFF4285F4)
                     : Colors.grey.shade600,

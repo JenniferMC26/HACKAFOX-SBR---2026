@@ -23,7 +23,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
   bool _photoSelected = false;
   XFile? _pickedImage;
   Uint8List? _imageBytes;
-  GeminiAnalysis? _analysis;
+  GroqAnalysis? _analysis;
   Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
 
@@ -34,7 +34,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
     try {
       final locationFuture = _getCurrentLocation();
       final analysis =
-          await ReportService.analyzeWithGemini(imageBytes: _imageBytes!);
+          await ReportService.analyzeWithGroq(imageBytes: _imageBytes!);
       _currentPosition = await locationFuture;
 
       if (!mounted) return;
@@ -111,7 +111,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
   }
 
   Future<void> _takePhoto() async {
-    // PERMISO EN ANDROID
+    // Android: solicitar permiso de cámara explícitamente
     if (!kIsWeb) {
       final cameraStatus = await Permission.camera.request();
       if (!cameraStatus.isGranted) {
@@ -130,28 +130,10 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
         return;
       }
     }
+    // Web: el navegador solicita el permiso automáticamente al abrir la cámara.
+    // No se realiza ningún pre-check — si el usuario deniega el acceso,
+    // pickImage lanza una excepción que se maneja en el bloque catch.
 
-    // PERMISO EN WEB — el navegador lo pide automáticamente
-    if (kIsWeb) {
-      final granted = await _requestWebCameraPermission();
-      if (!granted) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                'Permite el acceso a la cámara '
-                'en tu navegador para continuar'),
-            backgroundColor: const Color(0xFFEA4335),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-        return;
-      }
-    }
-
-    // ABRIR CÁMARA — igual en web y Android
     try {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
@@ -182,21 +164,12 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
     }
   }
 
-  Future<bool> _requestWebCameraPermission() async {
-    try {
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
   Color _severityColor() {
     if (_severityLevel <= 3) return const Color(0xFF34A853);
     if (_severityLevel <= 6) return const Color(0xFFFBBC04);
     return const Color(0xFFEA4335);
   }
 
-  /// Chip de severidad dinámico según nivel.
   Widget _buildSeverityChip() {
     final String label;
     final Color bg;
@@ -228,7 +201,6 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
     );
   }
 
-  /// Chips de perfiles afectados basados en el análisis real.
   List<Widget> _buildProfileChips() {
     if (_analysis == null || _analysis!.affectedProfiles.isEmpty) return [];
 
@@ -286,7 +258,6 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
         .toList();
   }
 
-  /// Texto de ubicación usando GPS real, o fallback si no está disponible.
   String _locationText() {
     if (_currentPosition == null) return 'Ubicación no disponible';
     final lat = _currentPosition!.latitude.toStringAsFixed(5);
@@ -357,7 +328,6 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
 
   Widget _buildBody() {
     if (_state == _ReportState.takingPhoto) {
-      // ESTADO: takingPhoto
       return SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -456,7 +426,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
               const SizedBox(height: 24),
               Semantics(
                 button: true,
-                label: "Tomar foto con la cámara y analizar con inteligencia artificial",
+                label: "Tomar foto con la cámara y analizar con Groq Vision",
                 child: SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -494,7 +464,6 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
         ),
       );
     } else if (_state == _ReportState.analyzing) {
-      // ESTADO: analyzing
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -502,7 +471,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
             CircularProgressIndicator(color: Color(0xFF4285F4), strokeWidth: 4),
             SizedBox(height: 24),
             Text(
-              "Gemini Vision está analizando...",
+              "Groq Vision está analizando...",
               style: TextStyle(fontSize: 16, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -516,7 +485,6 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
         ),
       );
     } else {
-      // ESTADO: result
       return SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -560,7 +528,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                   ),
                   SizedBox(width: 6),
                   Text(
-                    "Analizado por Llama Vision",
+                    "Analizado por Groq Vision",
                     style: TextStyle(
                       fontSize: 13,
                       color: Color(0xFF4285F4),

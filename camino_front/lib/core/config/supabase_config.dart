@@ -1,27 +1,18 @@
-/// Configuracion de Supabase para PASO.
+import 'package:camino_front/core/config/secrets.dart';
+
+/// Configuración de claves para PASO.
 ///
-/// IMPORTANTE: Reemplaza estos valores con tus claves reales.
-/// La anon key se encuentra en: Supabase Dashboard → Settings → API → anon public
+/// Las claves reales viven en secrets.dart (gitignoreado).
+/// Para un nuevo entorno: copia secrets.example.dart → secrets.dart
+/// y rellena los valores.
 ///
-/// Estas son claves PUBLICAS (anon key), protegidas por RLS.
-/// NUNCA incluir service_role key aqui.
+/// NUNCA hardcodees claves aquí ni las subas al repositorio.
 class SupabaseConfig {
   SupabaseConfig._();
 
-  // Supabase — Dashboard → Settings → API
-  static const supabaseUrl = 'https://xagroifcepcxhzeserda.supabase.co';
-
-  // Legacy anon key (JWT) — Dashboard → Settings → API Keys → Legacy
-  static const supabaseAnonKey =
-      'PON TU API KEY AQUI';
-
-  // Groq API — Groq Cloud → API Keys
-  static const groqApiKey = 'PON TU API KEY AQUI';
-
-  // Google Maps SDK (Android + Web) — Google Cloud Console → Credentials
-  static const googleMapsApiKey = 'PON TU API KEY AQUI';
-
-  // Google Places API — key separada, solo con Places API habilitada
-  // Reemplaza este valor con tu nueva key de Places
-  static const placesApiKey = 'PON TU API KEY AQUI';
+  static const supabaseUrl      = Secrets.supabaseUrl;
+  static const supabaseAnonKey  = Secrets.supabaseAnonKey;
+  static const groqApiKey       = Secrets.groqApiKey;
+  static const googleMapsApiKey = Secrets.googleMapsApiKey;
+  static const placesApiKey     = Secrets.placesApiKey;
 }

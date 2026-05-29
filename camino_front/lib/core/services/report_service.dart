@@ -6,8 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:camino_front/core/config/supabase_config.dart';
 import 'package:camino_front/core/services/auth_service.dart';
 
-/// Resultado del analisis de Gemini Vision.
-class GeminiAnalysis {
+/// Resultado del análisis de Groq Vision (llama-4-scout).
+class GroqAnalysis {
   final String barrierType;
   final int severity;
   final bool passable;
@@ -15,7 +15,7 @@ class GeminiAnalysis {
   final String description;
   final List<String> affectedProfiles;
 
-  GeminiAnalysis({
+  GroqAnalysis({
     required this.barrierType,
     required this.severity,
     required this.passable,
@@ -24,8 +24,8 @@ class GeminiAnalysis {
     required this.affectedProfiles,
   });
 
-  factory GeminiAnalysis.fromJson(Map<String, dynamic> json) {
-    return GeminiAnalysis(
+  factory GroqAnalysis.fromJson(Map<String, dynamic> json) {
+    return GroqAnalysis(
       barrierType: json['barrierType'] as String? ?? 'other',
       severity: (json['severity'] as num?)?.toInt() ?? 5,
       passable: json['passable'] as bool? ?? true,
@@ -46,7 +46,7 @@ class GeminiAnalysis {
         'affectedProfiles': affectedProfiles,
       };
 
-  /// Tipo de barrera en espanol para mostrar en UI.
+  /// Tipo de barrera en español para mostrar en UI.
   String get barrierTypeDisplay {
     const map = {
       'broken_ramp': 'Rampa destruida',
@@ -64,7 +64,7 @@ class GeminiAnalysis {
   }
 }
 
-/// Servicio para reportar barreras: foto, Gemini, Storage, DB.
+/// Servicio para reportar barreras: foto → Groq Vision → Storage → DB.
 class ReportService {
   ReportService._();
 
@@ -97,10 +97,10 @@ class ReportService {
   }
 
   /// Analiza una imagen con Groq Vision (llama-4-scout).
-  /// Retorna el analisis estructurado de la barrera.
-  /// Si la API key es invalida o la llamada falla, devuelve un mock
+  /// Retorna el análisis estructurado de la barrera.
+  /// Si la API key es inválida o la llamada falla, devuelve un mock
   /// realista para que el demo no se rompa.
-  static Future<GeminiAnalysis> analyzeWithGemini({
+  static Future<GroqAnalysis> analyzeWithGroq({
     required Uint8List imageBytes,
   }) async {
     final key = SupabaseConfig.groqApiKey;
@@ -155,7 +155,7 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
         }),
       );
 
-      // Errores de auth o key invalida → fallback sin romper el demo.
+      // Errores de auth o key inválida → fallback sin romper el demo.
       if (response.statusCode == 400 ||
           response.statusCode == 401 ||
           response.statusCode == 403) {
@@ -177,7 +177,7 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
           .trim();
 
       final analysisJson = jsonDecode(cleaned) as Map<String, dynamic>;
-      return GeminiAnalysis.fromJson(analysisJson);
+      return GroqAnalysis.fromJson(analysisJson);
     } catch (e) {
       // Cualquier error de red o parseo → mock para no romper el demo.
       if (e.toString().contains('Error Groq API')) rethrow;
@@ -185,9 +185,9 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
     }
   }
 
-  /// Analisis mock realista para usar cuando Gemini no esta disponible.
-  static GeminiAnalysis _mockAnalysis() {
-    return GeminiAnalysis(
+  /// Análisis mock realista para usar cuando Groq no está disponible.
+  static GroqAnalysis _mockAnalysis() {
+    return GroqAnalysis(
       barrierType: 'broken_sidewalk',
       severity: 7,
       passable: false,
@@ -204,14 +204,14 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
   /// 1. Sube foto a Storage
   /// 2. Inserta en reports
   /// 3. Llama upsert_node_near (RPC)
-  /// 4. Si severity >= 7, genera ticket civico
+  /// 4. Si severity >= 7, genera ticket cívico
   /// 5. Llama submit_report_background (RPC)
   static Future<Map<String, dynamic>> submitReport({
     required String photoPath,
     required Uint8List photoBytes,
     required double lat,
     required double lng,
-    required GeminiAnalysis analysis,
+    required GroqAnalysis analysis,
   }) async {
     final uid = AuthService.uid;
     if (uid == null) throw Exception('No hay sesion activa');
@@ -257,7 +257,7 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
       ticketId = ticketResponse as String;
     }
 
-    // Hora y dia para analitica ajustados a timezone Tijuana (UTC-7 / UTC-8).
+    // Hora y día para analítica ajustados a timezone Tijuana (UTC-7 / UTC-8).
     final now = DateTime.now().toUtc().subtract(const Duration(hours: 7));
     final hour = now.hour;
     final dow = now.weekday % 7; // 0=domingo en Supabase, weekday: 1=lunes
@@ -278,7 +278,7 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
       'p_affected_users': 0,
     });
 
-    // Actualizar ticket_id en el reporte si se genero
+    // Actualizar ticket_id en el reporte si se generó
     if (ticketId != null) {
       await _client
           .from('reports')

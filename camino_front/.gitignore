@@ -48,3 +48,7 @@ app.*.map.json
 android/local.properties
 ios/Flutter/secrets.xcconfig
 web/secrets.js
+
+# Claves secretas — nunca subir al repositorio
+.env
+lib/core/config/secrets.dart

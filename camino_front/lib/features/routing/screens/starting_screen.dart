@@ -9,6 +9,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:camino_front/core/config/supabase_config.dart';
 import 'package:camino_front/core/services/location_service.dart';
+import 'package:camino_front/core/services/places_js_service.dart';
 import 'package:camino_front/shared/services/permission_service.dart';
 import 'route_details_screen.dart';
 import 'package:camino_front/features/reporting/screens/report_barrier_screen.dart';
@@ -40,6 +41,11 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _debounce;
   bool _isFetchingSuggestions = false;
 
+  // Fix: flag para ignorar el cambio de texto que dispara _selectPlace
+  bool _ignoreNextChange = false;
+  // Fix: contador de secuencia para descartar respuestas obsoletas
+  int _requestSeq = 0;
+
   // Destinos frecuentes de Tijuana — fallback cuando Places API no responde.
   static const _fallbackPlaces = [
     {'place_id': 'fb_imss1', 'description': 'IMSS Clínica 1 Tijuana, Zona Río', 'main_text': 'IMSS Clínica 1 Tijuana', 'secondary_text': 'Blvd. Rodolfo Sánchez Taboada, Zona Río', 'lat': 32.5209, 'lng': -117.0261},
@@ -65,8 +71,6 @@ class _MapScreenState extends State<MapScreen> {
 
   // ── Blue dot ────────────────────────────────────────────────────────────
 
-  /// Dibuja el marcador azul con canvas — halo semitransparente + borde blanco
-  /// + punto azul central. Idéntico al dot de Google Maps.
   Future<void> _initBlueDot() async {
     const double size = 56;
     final recorder = ui.PictureRecorder();
@@ -110,7 +114,6 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  /// Solo centra la cámara — sin re-fetchar GPS ni reiniciar el stream.
   void _centerOnUser() {
     if (_currentPosition != null) {
       _mapController?.animateCamera(
@@ -125,7 +128,6 @@ class _MapScreenState extends State<MapScreen> {
 
   // ── Localización ────────────────────────────────────────────────────────
 
-  /// Obtiene la posición real, centra la cámara y arranca el stream.
   Future<void> _moveToUserLocation() async {
     final position = await LocationService.getCurrentPosition();
     if (!mounted) return;
@@ -143,7 +145,6 @@ class _MapScreenState extends State<MapScreen> {
     _startPositionTracking();
   }
 
-  /// Stream GPS en tiempo real — actualiza el dot sin mover la cámara.
   void _startPositionTracking() {
     _positionSub?.cancel();
     _positionSub = LocationService.positionStream().listen(
@@ -169,11 +170,91 @@ class _MapScreenState extends State<MapScreen> {
         .toList();
   }
 
+  /// Obtiene lugares cercanos al usuario.
+  /// Web → Places JS API (sin CORS).
+  /// Android/iOS → Places REST API directa.
+  Future<void> _fetchNearbyPlaces() async {
+    final lat = _currentPosition?.latitude ?? 32.5149;
+    final lng = _currentPosition?.longitude ?? -117.0382;
+
+    final mySeq = ++_requestSeq;
+    if (mounted) setState(() => _isFetchingSuggestions = true);
+
+    try {
+      List<Map<String, dynamic>> places;
+
+      if (kIsWeb) {
+        // En web la REST API es bloqueada por CORS — usamos Places JS API.
+        places = await fetchNearbyPlacesJS(lat, lng);
+      } else {
+        // Android/iOS → llamada REST directa, sin restricciones de CORS.
+        final uri = Uri.https(
+          'maps.googleapis.com',
+          '/maps/api/place/nearbysearch/json',
+          {
+            'location': '$lat,$lng',
+            'radius': '1500',
+            'key': SupabaseConfig.placesApiKey,
+            'language': 'es',
+          },
+        );
+        final response = await http.get(uri);
+        if (!mounted || mySeq != _requestSeq) return;
+
+        places = [];
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final results = data['results'] as List<dynamic>? ?? [];
+          places = results
+              .take(8)
+              .cast<Map<String, dynamic>>()
+              .map((p) {
+                final loc =
+                    p['geometry']?['location'] as Map<String, dynamic>?;
+                final name = p['name'] as String? ?? '';
+                final vicinity = p['vicinity'] as String? ?? '';
+                return <String, dynamic>{
+                  'place_id': p['place_id'] as String? ?? '',
+                  'description':
+                      vicinity.isNotEmpty ? '$name, $vicinity' : name,
+                  'main_text': name,
+                  'secondary_text': vicinity,
+                  if (loc != null) 'lat': (loc['lat'] as num).toDouble(),
+                  if (loc != null) 'lng': (loc['lng'] as num).toDouble(),
+                };
+              })
+              .where((p) => (p['place_id'] as String).isNotEmpty)
+              .toList();
+        }
+      }
+
+      if (!mounted || mySeq != _requestSeq) return;
+
+      // Solo aplicar si el campo sigue vacío (usuario no empezó a escribir)
+      if (places.isNotEmpty && _searchController.text.trim().isEmpty) {
+        setState(() => _suggestions = places);
+      }
+    } catch (_) {
+      // Error de red → fallback local ya visible.
+    } finally {
+      if (mounted && mySeq == _requestSeq) {
+        setState(() => _isFetchingSuggestions = false);
+      }
+    }
+  }
+
   void _onFocusChanged() {
-    if (_searchFocusNode.hasFocus && _suggestions.isEmpty) {
-      setState(() => _suggestions =
-          _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
-    } else if (!_searchFocusNode.hasFocus) {
+    if (_searchFocusNode.hasFocus) {
+      if (_suggestions.isEmpty) {
+        // Mostrar fallback local instantáneamente como placeholder
+        setState(() => _suggestions =
+            _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
+      }
+      // Si el campo está vacío, reemplazar con lugares cercanos reales
+      if (_searchController.text.trim().isEmpty) {
+        _fetchNearbyPlaces();
+      }
+    } else {
       Future.delayed(const Duration(milliseconds: 200), () {
         if (mounted && !_searchFocusNode.hasFocus) {
           setState(() => _suggestions = []);
@@ -183,12 +264,20 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onSearchChanged() {
+    // Fix: ignorar el cambio que dispara _selectPlace al asignar el texto
+    if (_ignoreNextChange) {
+      _ignoreNextChange = false;
+      return;
+    }
+
     _debounce?.cancel();
     final query = _searchController.text.trim();
 
     if (query.isEmpty) {
+      // Mostrar fallback como placeholder y reemplazar con cercanos reales
       setState(() => _suggestions =
           _fallbackPlaces.map((p) => Map<String, dynamic>.from(p)).toList());
+      _fetchNearbyPlaces();
       return;
     }
 
@@ -202,65 +291,129 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  /// Autocomplete al escribir.
+  /// Web → Places JS API (sin CORS).
+  /// Android/iOS → Places REST API directa.
   Future<void> _fetchSuggestions(String query) async {
-    if (_isFetchingSuggestions) return;
-    setState(() => _isFetchingSuggestions = true);
+    final mySeq = ++_requestSeq;
+    if (mounted) setState(() => _isFetchingSuggestions = true);
 
     try {
       final lat = _currentPosition?.latitude ?? 32.5149;
       final lng = _currentPosition?.longitude ?? -117.0382;
 
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': query,
-          'key': SupabaseConfig.placesApiKey,
-          'components': 'country:mx',
-          'language': 'es',
-          'location': '$lat,$lng',
-          'radius': '50000',
-        },
-      );
+      List<Map<String, dynamic>> results;
 
-      final response = await http.get(uri);
-      if (!mounted) return;
+      if (kIsWeb) {
+        // En web la REST API es bloqueada por CORS — usamos Places JS API.
+        results = await fetchAutocompleteSuggestionsJS(query, lat, lng);
+      } else {
+        // Android/iOS → llamada REST directa.
+        final uri = Uri.https(
+          'maps.googleapis.com',
+          '/maps/api/place/autocomplete/json',
+          {
+            'input': query,
+            'key': SupabaseConfig.placesApiKey,
+            'components': 'country:mx',
+            'language': 'es',
+            'location': '$lat,$lng',
+            'radius': '50000',
+          },
+        );
+        final response = await http.get(uri);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final predictions = data['predictions'] as List<dynamic>? ?? [];
-        final results = predictions.cast<Map<String, dynamic>>().map((p) => {
-              'place_id': p['place_id'] as String,
-              'description': p['description'] as String,
-              'main_text':
-                  (p['structured_formatting']?['main_text'] as String?) ??
-                      (p['description'] as String),
-              'secondary_text':
-                  (p['structured_formatting']?['secondary_text'] as String?) ??
-                      '',
-            }).toList();
+        // Descartar si llegó una request más nueva mientras esperábamos
+        if (!mounted || mySeq != _requestSeq) return;
 
-        if (results.isNotEmpty) setState(() => _suggestions = results);
+        results = [];
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final predictions = data['predictions'] as List<dynamic>? ?? [];
+          results = predictions
+              .cast<Map<String, dynamic>>()
+              .map((p) => <String, dynamic>{
+                    'place_id': p['place_id'] as String,
+                    'description': p['description'] as String,
+                    'main_text':
+                        (p['structured_formatting']?['main_text'] as String?) ??
+                            (p['description'] as String),
+                    'secondary_text': (p['structured_formatting']
+                            ?['secondary_text'] as String?) ??
+                        '',
+                  })
+              .toList();
+        }
       }
+
+      if (!mounted || mySeq != _requestSeq) return;
+      if (results.isNotEmpty) setState(() => _suggestions = results);
     } catch (_) {
-      // Sin red o CORS → fallback local ya visible.
+      // Error de red → fallback local ya visible.
     } finally {
-      if (mounted) setState(() => _isFetchingSuggestions = false);
+      if (mounted && mySeq == _requestSeq) {
+        setState(() => _isFetchingSuggestions = false);
+      }
     }
   }
 
+  /// Llama a Places Details para obtener las coordenadas exactas de un
+  /// resultado de la API (los fallback locales ya traen lat/lng embebidas).
+  Future<Map<String, double>?> _fetchPlaceDetails(String placeId) async {
+    try {
+      final uri = Uri.https(
+        'maps.googleapis.com',
+        '/maps/api/place/details/json',
+        {
+          'place_id': placeId,
+          'key': SupabaseConfig.placesApiKey,
+          'fields': 'geometry',
+        },
+      );
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final location = data['result']?['geometry']?['location']
+            as Map<String, dynamic>?;
+        if (location != null) {
+          return {
+            'lat': (location['lat'] as num).toDouble(),
+            'lng': (location['lng'] as num).toDouble(),
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _selectPlace(Map<String, dynamic> suggestion) async {
+    _debounce?.cancel();
+
+    // Fix: evitar que el listener re-dispare la búsqueda cuando asignamos
+    // el texto del campo programáticamente.
+    _ignoreNextChange = true;
+
     setState(() {
       _suggestions = [];
       _searchController.text = suggestion['main_text'] as String;
     });
     _searchFocusNode.unfocus();
 
+    double? destLat, destLng;
+
     if (suggestion.containsKey('lat') && suggestion.containsKey('lng')) {
       // Fallback local — coordenadas embebidas, sin llamada extra.
+      destLat = (suggestion['lat'] as num).toDouble();
+      destLng = (suggestion['lng'] as num).toDouble();
+    } else {
+      // Resultado real de Places API — resolver coordenadas vía Details.
+      final coords =
+          await _fetchPlaceDetails(suggestion['place_id'] as String);
+      if (coords != null) {
+        destLat = coords['lat'];
+        destLng = coords['lng'];
+      }
     }
-    // Para lugares reales, Places Details usaría también placesApiKey,
-    // pero la navegación ya funciona con el nombre.
 
     if (!mounted) return;
     Navigator.push(
@@ -268,6 +421,8 @@ class _MapScreenState extends State<MapScreen> {
       MaterialPageRoute(
         builder: (_) => RouteDetailsScreen(
           destination: suggestion['description'] as String,
+          destinationLat: destLat,
+          destinationLng: destLng,
         ),
       ),
     );
@@ -275,7 +430,6 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _requestPermissions() async {
     if (kIsWeb) {
-      // En web, geolocator pide permiso al browser automáticamente.
       await _moveToUserLocation();
       return;
     }
@@ -434,7 +588,6 @@ class _MapScreenState extends State<MapScreen> {
                 );
               }
             },
-            // Android → dot nativo con pulso. Web → marcador canvas dibujado.
             myLocationEnabled: !kIsWeb && _locationGranted,
             myLocationButtonEnabled: false,
             markers: kIsWeb ? _userMarker : {},
@@ -698,8 +851,11 @@ class _MapScreenState extends State<MapScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            RouteDetailsScreen(destination: destination),
+                        builder: (_) => RouteDetailsScreen(
+                          destination: destination,
+                          // Sin coordenadas cuando el usuario escribe
+                          // manualmente sin seleccionar una sugerencia.
+                        ),
                       ),
                     );
                   },
