@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:camino_front/core/services/auth_service.dart';
 import 'package:camino_front/features/auth/screens/login_screen.dart';
+import 'package:camino_front/features/routing/screens/starting_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,10 +25,13 @@ class _SplashScreenState extends State<SplashScreen> {
     setState(() => _opacity = 1.0);
     await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
+    final destination = AuthService.isLoggedIn
+        ? const MapScreen()
+        : const LoginScreen();
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, _, _) => const LoginScreen(),
+        pageBuilder: (_, _, _) => destination,
         transitionsBuilder: (_, animation, _, child) =>
             FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 500),

@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:camino_front/core/services/report_service.dart';
 import 'package:camino_front/features/reporting/screens/barrier_confirmed_screen.dart';
 
 enum _ReportState { takingPhoto, analyzing, result }
@@ -19,20 +24,93 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
   int _severityLevel = 0;
   String _analysisDescription = "";
   bool _photoSelected = false;
-  // ignore: unused_field
-  XFile? _photoFile;
+  XFile? _pickedImage;
+  Uint8List? _imageBytes;
+  GeminiAnalysis? _analysis;
+  Position? _currentPosition;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _runAnalysis() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() {
-      _state = _ReportState.result;
-      _barrierType = "Banqueta destruida";
-      _severityLevel = 8;
-      _analysisDescription =
-          "Se detecta daño severo en banqueta peatonal. Bloqueo total del paso para silla de ruedas y andadera. Ubicación: Calle 3ra entre Av. Revolución y Constitución, Centro Tijuana. Requiere intervención municipal urgente.";
-    });
+    if (_imageBytes == null) return;
+    setState(() => _state = _ReportState.analyzing);
+
+    try {
+      final locationFuture = _getCurrentLocation();
+      final analysis =
+          await ReportService.analyzeWithGemini(imageBytes: _imageBytes!);
+      _currentPosition = await locationFuture;
+
+      if (!mounted) return;
+      setState(() {
+        _state = _ReportState.result;
+        _analysis = analysis;
+        _barrierType = analysis.barrierTypeDisplay;
+        _severityLevel = analysis.severity;
+        _analysisDescription = analysis.description;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _state = _ReportState.takingPhoto);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Error al analizar la imagen. Intenta de nuevo.'),
+          backgroundColor: const Color(0xFFEA4335),
+        ),
+      );
+    }
+  }
+
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
+      }
+      if (permission == LocationPermission.deniedForever) return null;
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _submitReport() async {
+    if (_analysis == null || _pickedImage == null) return;
+    final lat = _currentPosition?.latitude ?? 32.5266;
+    final lng = _currentPosition?.longitude ?? -117.0382;
+
+    try {
+      final result = await ReportService.submitReport(
+        photoPath: _pickedImage!.path,
+        photoBytes: _imageBytes!,
+        lat: lat,
+        lng: lng,
+        analysis: _analysis!,
+      );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BarrierConfirmedScreen(
+            barrierType: _barrierType,
+            severityLevel: _severityLevel,
+            ticketId: result['ticketId'] as String?,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al enviar reporte: $e'),
+          backgroundColor: const Color(0xFFEA4335),
+        ),
+      );
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -84,8 +162,10 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
         preferredCameraDevice: CameraDevice.rear,
       );
       if (photo != null && mounted) {
+        final bytes = await photo.readAsBytes();
         setState(() {
-          _photoFile = photo;
+          _pickedImage = photo;
+          _imageBytes = bytes;
           _photoSelected = true;
         });
       }
@@ -295,10 +375,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                       ),
                     ),
                     onPressed: _photoSelected
-                        ? () {
-                            setState(() => _state = _ReportState.analyzing);
-                            _runAnalysis();
-                          }
+                        ? _runAnalysis
                         : () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -494,15 +571,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                         borderRadius: BorderRadius.circular(32),
                       ),
                     ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BarrierConfirmedScreen(
-                          barrierType: _barrierType,
-                          severityLevel: _severityLevel,
-                        ),
-                      ),
-                    ),
+                    onPressed: _submitReport,
                   ),
                 ),
               ),

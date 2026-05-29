@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:camino_front/core/services/auth_service.dart';
 import 'package:camino_front/features/auth/screens/register_screen.dart';
 import 'package:camino_front/features/routing/screens/starting_screen.dart';
 
@@ -20,17 +21,33 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     final phone = _phoneController.text.trim();
     final password = _passwordController.text.trim();
-    final isTestCredentials = phone == '6641234567' && password == '123456';
-    if (!isTestCredentials && !_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const MapScreen()),
-      (route) => false,
-    );
+
+    try {
+      await AuthService.signIn(phone: phone, password: password);
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MapScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      String errorMessage = 'Error al iniciar sesión';
+      if (e.toString().contains('Invalid login credentials')) {
+        errorMessage = 'Teléfono o contraseña incorrectos';
+      } else if (e.toString().contains('network')) {
+        errorMessage = 'Error de conexión. Verifica tu internet.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: const Color(0xFFEA4335),
+        ),
+      );
+    }
   }
 
   @override
@@ -103,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   SizedBox(height: 2),
                                   Text(
-                                    'Teléfono: 6641234567  ·  Contraseña: 123456',
+                                    'Registra un usuario con tu teléfono primero',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF5D4037),
