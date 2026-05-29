@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +26,10 @@ class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   LatLng? _userPosition;
 
+  // Marcador azul de posición del usuario (usado en web; Android usa myLocationEnabled).
+  Set<Marker> _userMarker = {};
+  BitmapDescriptor? _blueDotDescriptor;
+
   // Places Autocomplete
   List<Map<String, dynamic>> _suggestions = [];
   Timer? _debounce;
@@ -37,8 +43,57 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _initBlueDot();
     _requestPermissions();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  /// Dibuja el marcador azul de ubicación usando canvas —
+  /// círculo exterior semitransparente (halo de precisión) +
+  /// borde blanco + punto azul central, idéntico al de Google Maps.
+  Future<void> _initBlueDot() async {
+    const double size = 56;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Halo de precisión (azul semi-transparente)
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2,
+      Paint()
+        ..color = const Color(0x334285F4)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Borde blanco
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      15,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+
+    // Punto azul central
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      11,
+      Paint()
+        ..color = const Color(0xFF4285F4)
+        ..style = PaintingStyle.fill,
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) return;
+
+    final descriptor = BitmapDescriptor.fromBytes(
+      byteData.buffer.asUint8List(),
+      size: const Size(size, size),
+    );
+
+    if (mounted) setState(() => _blueDotDescriptor = descriptor);
   }
 
   /// Llama a Places Autocomplete con debounce de 400ms.
@@ -165,8 +220,9 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _requestPermissions() async {
     if (kIsWeb) {
-      setState(() => _locationGranted = true);
-      _moveToUserLocation();
+      // En web, LocationService usará la Geolocation API del navegador
+      // (el browser mostrará su propio diálogo de permiso).
+      await _moveToUserLocation();
       return;
     }
     final granted = await PermissionService.requestLocationPermission();
@@ -179,11 +235,31 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// Obtiene la posición GPS real y mueve la cámara a ella.
+  /// Obtiene la posición GPS real, mueve la cámara y actualiza el marcador azul.
   Future<void> _moveToUserLocation() async {
     final position = await LocationService.getCurrentPosition();
     if (!mounted) return;
-    setState(() => _userPosition = position);
+
+    // Construir el marcador azul (centrado en la posición) para web.
+    // En Android el dot nativo de myLocationEnabled ya lo cubre.
+    final marker = _blueDotDescriptor != null
+        ? Marker(
+            markerId: const MarkerId('user_location'),
+            position: position,
+            icon: _blueDotDescriptor!,
+            anchor: const Offset(0.5, 0.5),
+            zIndex: 10,
+            infoWindow: InfoWindow.noText,
+            consumeTapEvents: false,
+          )
+        : null;
+
+    setState(() {
+      _userPosition = position;
+      _locationGranted = true;
+      if (marker != null) _userMarker = {marker};
+    });
+
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(target: position, zoom: 15.5),
@@ -331,8 +407,11 @@ class _MapScreenState extends State<MapScreen> {
                 );
               }
             },
-            myLocationEnabled: _locationGranted,
+            // Android: dot nativo con halo de precisión y animación de pulso.
+            // Web: marcador personalizado dibujado (_userMarker).
+            myLocationEnabled: !kIsWeb && _locationGranted,
             myLocationButtonEnabled: false,
+            markers: kIsWeb ? _userMarker : {},
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             compassEnabled: false,
