@@ -54,8 +54,10 @@ class GeminiAnalysis {
       'no_curb_cut': 'Sin rebaje de banqueta',
       'broken_sidewalk': 'Banqueta destruida',
       'blocked_sidewalk': 'Banqueta bloqueada',
+      'blocked_ramp': 'Rampa bloqueada',
       'steep_slope': 'Pendiente pronunciada',
-      'other': 'Otro obstaculo',
+      'damaged_surface': 'Superficie dañada',
+      'other': 'Otro obstáculo',
       'none': 'Sin barrera',
     };
     return map[barrierType] ?? barrierType;
@@ -94,18 +96,17 @@ class ReportService {
     return signedUrl;
   }
 
-  /// Analiza una imagen con Gemini Vision API.
+  /// Analiza una imagen con Groq Vision (llama-4-scout).
   /// Retorna el analisis estructurado de la barrera.
   /// Si la API key es invalida o la llamada falla, devuelve un mock
   /// realista para que el demo no se rompa.
   static Future<GeminiAnalysis> analyzeWithGemini({
     required Uint8List imageBytes,
   }) async {
-    final key = SupabaseConfig.geminiApiKey;
+    final key = SupabaseConfig.groqApiKey;
 
-    // Validar formato de key antes de hacer la peticion.
-    // Las keys de Gemini/Google AI empiezan con "AIza".
-    if (!key.startsWith('AIza')) {
+    // Las keys de Groq empiezan con "gsk_".
+    if (!key.startsWith('gsk_')) {
       return _mockAnalysis();
     }
 
@@ -113,43 +114,44 @@ class ReportService {
 
     try {
       final response = await http.post(
-        Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-        ),
+        Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': key,
+          'Authorization': 'Bearer $key',
         },
         body: jsonEncode({
-          'contents': [
+          'model': 'meta-llama/llama-4-scout-17b-16e-instruct',
+          'messages': [
             {
-              'parts': [
+              'role': 'user',
+              'content': [
                 {
-                  'text': '''Analiza esta imagen de una calle o banqueta en Tijuana, Mexico.
-Identifica si hay una barrera de accesibilidad para personas con movilidad reducida.
+                  'type': 'text',
+                  'text': '''Eres un experto en accesibilidad urbana. Analiza TODA la imagen en detalle: banqueta, rampas, accesos a edificios, cruces peatonales, obstáculos, superficie del piso, desniveles, señalización y cualquier elemento relevante para personas con movilidad reducida en Tijuana, Mexico.
+
+Considera el contexto completo de la escena: si hay rampas, evalúa su condición y si están bloqueadas; si hay accesos a edificios, si son accesibles; si hay obstáculos temporales o permanentes; si la superficie es transitable.
 
 Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
 {
-  "barrierType": "broken_ramp | missing_ramp | no_curb_cut | broken_sidewalk | blocked_sidewalk | steep_slope | other | none",
+  "barrierType": "broken_ramp | missing_ramp | no_curb_cut | broken_sidewalk | blocked_sidewalk | blocked_ramp | steep_slope | damaged_surface | other | none",
   "severity": 1-10,
   "passable": true/false,
   "confidence": 0.0-1.0,
-  "description": "descripcion breve en espanol",
+  "description": "descripcion detallada en espanol de lo que se observa en toda la imagen y por que representa o no una barrera",
   "affectedProfiles": ["wheelchair", "elderly", "cane", "stroller"]
-}'''
+}''',
                 },
                 {
-                  'inline_data': {
-                    'mime_type': 'image/jpeg',
-                    'data': base64Image,
-                  }
-                }
-              ]
+                  'type': 'image_url',
+                  'image_url': {
+                    'url': 'data:image/jpeg;base64,$base64Image',
+                  },
+                },
+              ],
             }
           ],
-          'generationConfig': {
-            'temperature': 0.1,
-          }
+          'temperature': 0.1,
+          'max_tokens': 512,
         }),
       );
 
@@ -161,14 +163,14 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
       }
 
       if (response.statusCode != 200) {
-        throw Exception('Error de Gemini API: ${response.statusCode}');
+        throw Exception('Error Groq API: ${response.statusCode}');
       }
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final text =
-          body['candidates'][0]['content']['parts'][0]['text'] as String;
+          body['choices'][0]['message']['content'] as String;
 
-      // Limpiar respuesta — Gemini a veces envuelve en ```json ... ```
+      // Limpiar respuesta — el modelo a veces envuelve en ```json ... ```
       final cleaned = text
           .replaceAll(RegExp(r'```json\s*'), '')
           .replaceAll(RegExp(r'```\s*'), '')
@@ -178,7 +180,7 @@ Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks):
       return GeminiAnalysis.fromJson(analysisJson);
     } catch (e) {
       // Cualquier error de red o parseo → mock para no romper el demo.
-      if (e.toString().contains('Error de Gemini API')) rethrow;
+      if (e.toString().contains('Error Groq API')) rethrow;
       return _mockAnalysis();
     }
   }

@@ -16,6 +16,8 @@ class _PanicScreenState extends State<PanicScreen> {
   bool _isSubmitting = false;
   int _countdown = 3;
   String? _sessionId;
+  Position? _crisisPosition;
+  String _contactName = 'Contacto de emergencia';
 
   void _startCountdown() {
     if (_isCounting) return;
@@ -72,12 +74,15 @@ class _PanicScreenState extends State<PanicScreen> {
 
       final lat = position?.latitude ?? 32.5266;
       final lng = position?.longitude ?? -117.0382;
-      _sessionId = await CrisisService.startCrisis(lat: lat, lng: lng);
+      final result = await CrisisService.startCrisis(lat: lat, lng: lng);
 
       if (!mounted) return;
       setState(() {
         _isActivated = true;
         _isSubmitting = false;
+        _sessionId = result['sessionId'] as String;
+        _contactName = result['contactName'] as String;
+        _crisisPosition = position;
       });
     } catch (e) {
       if (!mounted) return;
@@ -409,7 +414,10 @@ class _PanicScreenState extends State<PanicScreen> {
                               _buildConfirmRow(
                                 Icons.location_on_rounded,
                                 'Ubicación',
-                                'Centro, Tijuana',
+                                _crisisPosition != null
+                                    ? '${_crisisPosition!.latitude.toStringAsFixed(5)}, '
+                                      '${_crisisPosition!.longitude.toStringAsFixed(5)}'
+                                    : 'No disponible',
                               ),
                               const Divider(
                                 color: Color(0xFFC8E6C9),
@@ -418,7 +426,7 @@ class _PanicScreenState extends State<PanicScreen> {
                               _buildConfirmRow(
                                 Icons.person_rounded,
                                 'Contacto notificado',
-                                'Contacto de emergencia',
+                                _contactName,
                               ),
                               if (_sessionId != null) ...[
                                 const Divider(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -38,12 +39,14 @@ class LocationService {
     }
   }
 
-  /// Stream de actualizaciones de posición (cada 10 m o 5 s).
+  /// Stream de actualizaciones de posición en tiempo real.
+  /// Web: distanceFilter 0 → el browser entrega cada fix GPS sin filtrar.
+  /// Android: distanceFilter 5 m → balance entre frecuencia y batería.
   static Stream<LatLng> positionStream() {
     return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: kIsWeb ? 0 : 5,
       ),
     ).map((pos) => LatLng(pos.latitude, pos.longitude));
   }

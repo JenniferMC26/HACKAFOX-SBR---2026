@@ -196,6 +196,104 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
     return const Color(0xFFEA4335);
   }
 
+  /// Chip de severidad dinámico según nivel.
+  Widget _buildSeverityChip() {
+    final String label;
+    final Color bg;
+    final Color fg;
+    final IconData icon;
+
+    if (_severityLevel <= 3) {
+      label = 'Riesgo bajo';
+      bg    = const Color(0xFFE6F4EA);
+      fg    = const Color(0xFF34A853);
+      icon  = Icons.check_circle_outline_rounded;
+    } else if (_severityLevel <= 6) {
+      label = 'Riesgo medio';
+      bg    = const Color(0xFFFEF7E0);
+      fg    = const Color(0xFFFBBC04);
+      icon  = Icons.warning_amber_rounded;
+    } else {
+      label = 'Riesgo alto';
+      bg    = const Color(0xFFFDECEA);
+      fg    = const Color(0xFFEA4335);
+      icon  = Icons.warning_rounded;
+    }
+
+    return Chip(
+      avatar: Icon(icon, size: 14, color: fg),
+      label: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+      backgroundColor: bg,
+      side: BorderSide.none,
+    );
+  }
+
+  /// Chips de perfiles afectados basados en el análisis real.
+  List<Widget> _buildProfileChips() {
+    if (_analysis == null || _analysis!.affectedProfiles.isEmpty) return [];
+
+    const profileMap = <String, Map<String, dynamic>>{
+      'wheelchair': {
+        'label': 'Silla de ruedas',
+        'icon': Icons.accessible_forward_rounded,
+        'color': Color(0xFF4285F4),
+        'bg': Color(0xFFE8F0FE),
+      },
+      'elderly': {
+        'label': 'Adulto mayor',
+        'icon': Icons.elderly_rounded,
+        'color': Color(0xFF9C27B0),
+        'bg': Color(0xFFF3E5F5),
+      },
+      'cane': {
+        'label': 'Bastón',
+        'icon': Icons.accessibility_new_rounded,
+        'color': Color(0xFF795548),
+        'bg': Color(0xFFEFEBE9),
+      },
+      'stroller': {
+        'label': 'Carriola',
+        'icon': Icons.child_friendly_rounded,
+        'color': Color(0xFF00897B),
+        'bg': Color(0xFFE0F2F1),
+      },
+    };
+
+    return _analysis!.affectedProfiles
+        .where(profileMap.containsKey)
+        .map((profile) {
+          final data = profileMap[profile]!;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Chip(
+              avatar: Icon(
+                data['icon'] as IconData,
+                size: 14,
+                color: data['color'] as Color,
+              ),
+              label: Text(
+                data['label'] as String,
+                style: TextStyle(
+                  color: data['color'] as Color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              backgroundColor: data['bg'] as Color,
+              side: BorderSide.none,
+            ),
+          );
+        })
+        .toList();
+  }
+
+  /// Texto de ubicación usando GPS real, o fallback si no está disponible.
+  String _locationText() {
+    if (_currentPosition == null) return 'Ubicación no disponible';
+    final lat = _currentPosition!.latitude.toStringAsFixed(5);
+    final lng = _currentPosition!.longitude.toStringAsFixed(5);
+    return '$lat, $lng';
+  }
+
   Widget _buildResultRow(
     String label,
     String value,
@@ -431,8 +529,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                     ? Image.memory(
                         _imageBytes!,
                         width: double.infinity,
-                        height: 200,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.fitWidth,
                       )
                     : Container(
                         width: double.infinity,
@@ -463,7 +560,7 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                   ),
                   SizedBox(width: 6),
                   Text(
-                    "Analizado por Gemini Vision",
+                    "Analizado por Llama Vision",
                     style: TextStyle(
                       fontSize: 13,
                       color: Color(0xFF4285F4),
@@ -497,29 +594,12 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                       _severityColor(),
                     ),
                     const Divider(color: Color(0xFFF1F3F4)),
-                    Row(
+                    Wrap(
+                      spacing: 0,
+                      runSpacing: 8,
                       children: [
-                        const Chip(
-                          avatar: Icon(
-                            Icons.warning_amber_rounded,
-                            size: 14,
-                            color: Color(0xFFFBBC04),
-                          ),
-                          label: Text("Riesgo alto"),
-                          backgroundColor: Color(0xFFFEF7E0),
-                          side: BorderSide.none,
-                        ),
-                        const SizedBox(width: 8),
-                        const Chip(
-                          avatar: Icon(
-                            Icons.accessible_forward_rounded,
-                            size: 14,
-                            color: Color(0xFF4285F4),
-                          ),
-                          label: Text("Silla de ruedas"),
-                          backgroundColor: Color(0xFFE8F0FE),
-                          side: BorderSide.none,
-                        ),
+                        _buildSeverityChip(),
+                        ..._buildProfileChips(),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -535,17 +615,17 @@ class _ReportBarrierScreenState extends State<ReportBarrierScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Row(
+              Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_on_rounded,
                     color: Color(0xFFEA4335),
                     size: 16,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
-                    "Capturada automáticamente · Calle 3ra, Centro Tijuana",
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                    "Capturada automáticamente · ${_locationText()}",
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
                   ),
                 ],
               ),

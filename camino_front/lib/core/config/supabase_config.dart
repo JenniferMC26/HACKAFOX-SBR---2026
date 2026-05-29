@@ -15,8 +15,8 @@ class SupabaseConfig {
   static const supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhZ3JvaWZjZXBjeGh6ZXNlcmRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMDc0OTYsImV4cCI6MjA5NTU4MzQ5Nn0.Wbq5mAnXN977QehJIGZhvsBmCD545SUCl9hdysm_ADI';
 
-  // Gemini API — Google AI Studio → API Keys
-  static const geminiApiKey = 'AQ.Ab8RN6J-S88uiwMgz3olWAcN6yxwAzERh4q76GXHNkGoaxOQsQ';
+  // Groq API — Groq Cloud → API Keys
+  static const groqApiKey = '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';
 
   // Google Maps — Google Cloud Console → APIs & Services → Credentials
   static const googleMapsApiKey = 'AIzaSyCjd1xBS1fJqOWOCyQTzCKL8wykQi9PaNI';
