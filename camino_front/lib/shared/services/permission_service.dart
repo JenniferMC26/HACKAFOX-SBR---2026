@@ -30,4 +30,24 @@ class PermissionService {
       return false;
     }
   }
+
+  static Future<bool> requestMicrophonePermission() async {
+    if (kIsWeb) return await _requestWebMicrophone();
+    final status = await Permission.microphone.request();
+    return status.isGranted;
+  }
+
+  static Future<bool> hasMicrophonePermission() async {
+    if (kIsWeb) return true;
+    final status = await Permission.microphone.status;
+    return status.isGranted;
+  }
+
+  static Future<bool> _requestWebMicrophone() async {
+    try {
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }

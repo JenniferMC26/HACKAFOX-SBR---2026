@@ -99,6 +99,59 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Future<void> _requestMicPermission() async {
+    final granted = await PermissionService.requestMicrophonePermission();
+    if (!mounted) return;
+    if (granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.mic_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Micrófono activado',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF34A853),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.mic_off_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Permiso de micrófono necesario',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFEA4335),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          action: SnackBarAction(
+            label: 'Ajustes',
+            textColor: Colors.white,
+            onPressed: () => PermissionService.openSettings(),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -158,10 +211,13 @@ class _MapScreenState extends State<MapScreen> {
                       color: Color(0xFF4285F4),
                       size: 28,
                     ),
-                    suffixIcon: const Icon(
-                      Icons.mic_rounded,
-                      color: Color(0xFF4285F4),
-                      size: 28,
+                    suffixIcon: IconButton(
+                      icon: const Icon(
+                        Icons.mic_rounded,
+                        color: Color(0xFF4285F4),
+                        size: 28,
+                      ),
+                      onPressed: _requestMicPermission,
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 16),
